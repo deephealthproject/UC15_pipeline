@@ -8,9 +8,9 @@ The downloaded zip file weights **390 GB**. After decompressing the data, the si
 
 ### How to decompress the dataset
 
-We suggest you to use the bash script **dataset_preparation.sh** to decompress the downloaded zip file. To do so, run the comand:
+We suggest you to use the bash script **decompress_dataset.sh** to decompress the downloaded zip file. To do so, run the comand:
 ```bash
-./dataset_preparation.sh -i <PATH_TO_DATASET_ZIP> -o <OUTPUT_FOLDER>
+./decompress_dataset.sh -i <PATH_TO_DATASET_ZIP> -o <OUTPUT_FOLDER>
 ```
 Note: It will create a folder called **BIMCV-COVID19-cIter_1_2** inside the provided **OUTPUT_FOLDER**. The entire decompression may take a **couple of hours**.
 

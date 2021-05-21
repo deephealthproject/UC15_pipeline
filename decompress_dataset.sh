@@ -7,12 +7,12 @@
 
 print_help() {
     echo "Script Arguments:"
-    echo "  -i FILE_PATH  Path to the dataset .zip file (default ./bimcv_covid+.zip)"
+    echo "  -i FILE_PATH  Path to the dataset .zip file (default ./BIMCV-COVID19-cIter_1_2.zip)"
     echo "  -o DIR_PATH   Path to the folder to store the decompressed data (default ./)"
 }
 
 # Set default arguments
-input_path="./bimcv_covid+.zip"
+input_path="./BIMCV-COVID19-cIter_1_2.zip"
 output_path="./"
 
 # Parse script arguments
