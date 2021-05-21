@@ -13,6 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from lib.data_processing import get_labels_from_str, create_ecvl_yaml
+from lib.image_processing import histogram_equalization
 
 
 # Script arguments handler
@@ -47,7 +48,7 @@ arg_parser.add_argument(
     default=[0.6, 0.2, 0.2],
     type=float)
 
-# Get config from arguments
+# Set config
 args = arg_parser.parse_args()
 subjects_path = args.data_path
 np.random.seed(args.seed)  # Set the random seed for Numpy
@@ -56,6 +57,10 @@ target_labels = args.labels  # Training labels
 
 splits_sizes = args.splits
 assert sum(splits_sizes) == 1, "The splits values sum must be 1.0!"
+
+# Name of the directory to store the preprocessed images. It will be created
+# inside the subjects data folder ("covid19_posi").
+preproc_dirname = "preprocessed_data"
 
 """
 Load and prepare data
@@ -134,6 +139,9 @@ main_df = pd.DataFrame(columns=['subject',
                                 'gender',
                                 'age'])
 
+# Prepare the folder to store the preprocessed images
+os.makedirs(os.path.join(subjects_path, preproc_dirname), exist_ok=True)
+
 # Iterate over each sample to collect all the data to create the new "main_df"
 print("Collecting samples data:")
 for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
@@ -150,6 +158,13 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     # Get the list of target labels ("COVID 19", "normal",...)
     row_labels = row_labels["Labels"].values[0]
 
+    # Apply preprocessing
+    #  Note: We create a new image with the preprocessing applied
+    orig_img_path = os.path.join(subjects_path, row['filepath'])
+    new_img_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
+    new_img_path = os.path.join(subjects_path, new_img_path)
+    histogram_equalization(orig_img_path, new_img_path)
+
     # Get subject data (age, gender...)
     sub_data = subjects_df[subjects_df["participant"] == sub_id]
     assert len(sub_data.index) == 1  # Sanity check
@@ -159,7 +174,7 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     # Add the a row to the main DataFrame with the collected data
     new_row = {'subject': sub_id,
                'session': sess_id,
-               'filepath': img_path,
+               'filepath': new_img_path,
                'labels': row_labels,
                'gender': sub_gender,
                'age': sub_age}

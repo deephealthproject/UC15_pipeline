@@ -5,6 +5,7 @@ to processing functions.
 import numpy as np
 from PIL import Image
 import nibabel as nib
+from skimage import exposure
 
 
 def png2numpy(png_path: str) -> np.ndarray:
@@ -68,3 +69,38 @@ def get_stats(img_file_path: str) -> list:
     """
     img = load_numpy_data(img_file_path)
     return [img.mean(), img.std(), img.max(), img.mean(), img.shape]
+
+
+def histogram_equalization(img_path: str,
+                           img_outpath: str,
+                           hist_type: str = "adaptive"):
+    """
+    Applies histogram equalization to the image given and stores the
+    preprocessed version in the provided output path.
+
+    Args:
+        img_path: Path to the image to preprocess (it must be a .png).
+
+        img_outpath: Path of the output .png file to create.
+
+        hist_type: Type of histogram equalization.
+                   It can be "normal" or "adaptive".
+    """
+    img = load_numpy_data(img_path)
+
+    # Apply equalization
+    if hist_type == "adaptive":
+        img = exposure.equalize_adapthist(img)
+    elif hist_type == "normal":
+        img = exposure.equalize_hist(img)
+    else:
+        raise Exception("Wrong histogram equalization type provided!")
+
+    # After histogram equalization the values are floats in the range [0-1].
+    # Convert the images to the range [0-255] with uint8 values
+    img = np.uint8(img * 255.0)
+
+    # Store the processed image
+    pil_img = Image.fromarray(img, mode='L')
+    img = np.array(pil_img)
+    pil_img.save(img_outpath, format="PNG")
