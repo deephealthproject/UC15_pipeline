@@ -7,6 +7,7 @@ also provides the partitions for training, validation and test.
 import os
 import argparse
 import ast
+import multiprocessing as mp
 
 import numpy as np
 import pandas as pd
@@ -48,6 +49,12 @@ arg_parser.add_argument(
     default=[0.6, 0.2, 0.2],
     type=float)
 
+arg_parser.add_argument(
+    "--n-proc",
+    help="Number of processes to use for preprocessing the data",
+    default=mp.cpu_count(),
+    type=int)
+
 # Set config
 args = arg_parser.parse_args()
 subjects_path = args.data_path
@@ -57,6 +64,8 @@ target_labels = args.labels  # Training labels
 
 splits_sizes = args.splits
 assert sum(splits_sizes) == 1, "The splits values sum must be 1.0!"
+
+n_proc = args.n_proc
 
 # Name of the directory to store the preprocessed images. It will be created
 # inside the subjects data folder ("covid19_posi").
@@ -142,6 +151,10 @@ main_df = pd.DataFrame(columns=['subject',
 # Prepare the folder to store the preprocessed images
 os.makedirs(os.path.join(subjects_path, preproc_dirname), exist_ok=True)
 
+# Here we store pairs of images paths (orig, dest) of the images that we are
+# going to preprocess. We do this to execute the preprocessing in parallel.
+images_to_preprocess = []
+
 # Iterate over each sample to collect all the data to create the new "main_df"
 print("Collecting samples data:")
 for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
@@ -163,7 +176,8 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     orig_img_path = os.path.join(subjects_path, row['filepath'])
     new_img_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
     new_img_path = os.path.join(subjects_path, new_img_path)
-    histogram_equalization(orig_img_path, new_img_path)
+    # Add the image to the preprocessing queue
+    images_to_preprocess.append((orig_img_path, new_img_path))
 
     # Get subject data (age, gender...)
     sub_data = subjects_df[subjects_df["participant"] == sub_id]
@@ -180,6 +194,9 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
                'age': sub_age}
     main_df = main_df.append(new_row, ignore_index=True)
 
+# Apply the preprocessing to the images (in parallel)
+with mp.Pool(processes=n_proc) as pool:
+    pool.starmap(histogram_equalization, images_to_preprocess, 10)
 
 """
 Create the splits (training, validation, test).
@@ -227,6 +244,6 @@ Prepare the YAML file to create the ECVL Dataset objects from the DataFrame
 created with all the informaton about the samples.
 """
 
-yaml_outfile = os.path.join(subjects_path, "ecvl_bimcv_covid19+.yaml")
+yaml_outfile = os.path.join(subjects_path, "ecvl_bimcv_covid19.yaml")
 create_ecvl_yaml(main_df, yaml_outfile, target_labels)
 print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
