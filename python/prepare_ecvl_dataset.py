@@ -19,7 +19,8 @@ from lib.image_processing import histogram_equalization
 
 # Script arguments handler
 arg_parser = argparse.ArgumentParser(
-    description="Creates the YAML file to create the ECVL Dataset",
+    description=("Prepares the YAML file to create the ECVL Dataset. The YAML "
+                 "file will be placed in the data-path provided"),
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 arg_parser.add_argument(
@@ -55,6 +56,12 @@ arg_parser.add_argument(
     default=mp.cpu_count(),
     type=int)
 
+arg_parser.add_argument(
+    "--yaml-name",
+    help="Name of the YAML file to create (without the file extension)",
+    default="ecvl_bimcv_covid19",
+    type=str)
+
 # Set config
 args = arg_parser.parse_args()
 subjects_path = args.data_path
@@ -66,6 +73,7 @@ splits_sizes = args.splits
 assert sum(splits_sizes) == 1, "The splits values sum must be 1.0!"
 
 n_proc = args.n_proc
+yaml_name = args.yaml_name
 
 # Name of the directory to store the preprocessed images. It will be created
 # inside the subjects data folder ("covid19_posi").
@@ -236,7 +244,7 @@ n_te_samples = len(main_df[main_df['split'] == 'test'])
 print(f"Test split samples: {n_te_samples}")
 
 # Store the new main DataFrame to a TSV
-main_df_outfile = os.path.join(derivatives_path, "splits_data.tsv")
+main_df_outfile = os.path.join(derivatives_path, "{yaml_name}.tsv")
 main_df.to_csv(main_df_outfile, sep='\t', index=False)
 print(f'\nStored splits data in "{main_df_outfile}"')
 
@@ -245,6 +253,6 @@ Prepare the YAML file to create the ECVL Dataset objects from the DataFrame
 created with all the informaton about the samples.
 """
 
-yaml_outfile = os.path.join(subjects_path, "ecvl_bimcv_covid19.yaml")
+yaml_outfile = os.path.join(subjects_path, f"{yaml_name}.yaml")
 create_ecvl_yaml(main_df, yaml_outfile, target_labels)
 print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
