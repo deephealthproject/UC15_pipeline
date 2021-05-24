@@ -77,7 +77,8 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--epochs",
         help="Number of epochs to train",
-        default=10)
+        default=10,
+        type=int)
 
     arg_parser.add_argument(
         "--augmentations", "-augs",
