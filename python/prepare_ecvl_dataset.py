@@ -171,12 +171,13 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     # Get the list of target labels ("COVID 19", "normal",...)
     row_labels = row_labels["Labels"].values[0]
 
-    # Apply preprocessing
-    #  Note: We create a new image with the preprocessing applied
+    # This path must be relative to the folder where the YAML will be created
+    new_img_relative_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
+
+    # Add the image to the preprocessing queue with the input and output paths
+    # for the preprocessing function
     orig_img_path = os.path.join(subjects_path, row['filepath'])
-    new_img_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
-    new_img_path = os.path.join(subjects_path, new_img_path)
-    # Add the image to the preprocessing queue
+    new_img_path = os.path.join(subjects_path, new_img_relative_path)
     images_to_preprocess.append((orig_img_path, new_img_path))
 
     # Get subject data (age, gender...)
@@ -188,7 +189,7 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     # Add the a row to the main DataFrame with the collected data
     new_row = {'subject': sub_id,
                'session': sess_id,
-               'filepath': new_img_path,
+               'filepath': new_img_relative_path,
                'labels': row_labels,
                'gender': sub_gender,
                'age': sub_age}

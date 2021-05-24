@@ -2,7 +2,7 @@ import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 from pyeddl.tensor import Tensor
 
-yaml_path = "../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19+.yaml"
+yaml_path = "../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19.yaml"
 batch_size = 16
 H, W = 512, 512
 
