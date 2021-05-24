@@ -35,7 +35,10 @@ def get_labels_from_str(labels_str: str, verbose: bool = False) -> list:
     return list(map(str.strip, labels_list))
 
 
-def create_ecvl_yaml(df: pd.DataFrame, yaml_path: str, target_labels: list):
+def create_ecvl_yaml(df: pd.DataFrame,
+                     yaml_path: str,
+                     target_labels: list,
+                     multiclass: bool) -> dict:
     """
     Given a DataFrame with all the necessary data to create a training dataset,
     this function creates a YAML file to be able to create the corresponding
@@ -48,8 +51,14 @@ def create_ecvl_yaml(df: pd.DataFrame, yaml_path: str, target_labels: list):
         yaml_path: Path to store the created YAML file.
 
         target_labels: A list with the labels to use for classification. The
-                       labels that are not present in this list will be avoided
-                       when creating the YAML samples.
+                       order is important, the first matching label will be
+                       taken as the label for the sample.
+
+        multiclass: If True, instead of taking just the first matching label
+                    for each sample, all the matching labels will be taken.
+
+    Returns:
+        A dictionary with the counts of the samples by label.
     """
 
     yaml_outstream = open(yaml_path, 'w')  # YAML output file stream
@@ -75,9 +84,22 @@ def create_ecvl_yaml(df: pd.DataFrame, yaml_path: str, target_labels: list):
     # Auxiliary set object to compute intersections of labels sets
     target_labels_set = set(target_labels)
 
+    counts_dict = {}  # Counts by label to return at the end
+
     for sample_idx, (_, row) in enumerate(df.iterrows()):
-        # Get only the labels that belong to the target_labels list provided
-        labels = list(target_labels_set.intersection(set(row["labels"])))
+        # Get the labels for the sample
+        if multiclass:
+            labels = list(target_labels_set.intersection(set(row["labels"])))
+            label_name = "_and_".join(sorted(labels))
+            counts_dict[label_name] = counts_dict.get(label_name, 0) + 1
+        else:
+            labels = []
+            for label in target_labels:
+                if label in row["labels"]:
+                    labels.append(label)
+                    counts_dict[label] = counts_dict.get(label, 0) + 1
+                    break  # We take the first matching label
+
         assert len(labels) > 0  # Sanity check
 
         # Store the sample data
@@ -100,3 +122,5 @@ def create_ecvl_yaml(df: pd.DataFrame, yaml_path: str, target_labels: list):
               default_flow_style=None)
 
     yaml_outstream.close()
+
+    return counts_dict

@@ -36,11 +36,19 @@ arg_parser.add_argument(
 
 arg_parser.add_argument(
     "--labels",
-    help="Target labels to select the samples for training",
+    help=("Target labels to select the samples for training. "
+          "The order is important, the first matching label will be taken "
+          "as the label for the sample."),
     metavar="label_name",
     nargs='+',
-    default=["COVID 19", "infiltrates", "pneumonia", "normal"],
+    default=["normal", "COVID 19", "pneumonia", "infiltrates"],
     type=str)
+
+arg_parser.add_argument(
+    "--multiclass",
+    help=("To create multiclass labels instead of taking one label from "
+          "each sample"),
+    action="store_true")
 
 arg_parser.add_argument(
     "--splits",
@@ -62,12 +70,14 @@ arg_parser.add_argument(
     default="ecvl_bimcv_covid19",
     type=str)
 
+
 # Set config
 args = arg_parser.parse_args()
 subjects_path = args.data_path
 np.random.seed(args.seed)  # Set the random seed for Numpy
 
 target_labels = args.labels  # Training labels
+multiclass = args.multiclass
 
 splits_sizes = args.splits
 assert sum(splits_sizes) == 1, "The splits values sum must be 1.0!"
@@ -204,8 +214,10 @@ for idx, row in tqdm(selected_samples.iterrows(), total=len(selected_samples)):
     main_df = main_df.append(new_row, ignore_index=True)
 
 # Apply the preprocessing to the images (in parallel)
+print("\nPreprocessing the images...")
 with mp.Pool(processes=n_proc) as pool:
     pool.starmap(histogram_equalization, images_to_preprocess, 10)
+print("Images preprocessed!")
 
 """
 Create the splits (training, validation, test).
@@ -244,7 +256,7 @@ n_te_samples = len(main_df[main_df['split'] == 'test'])
 print(f"Test split samples: {n_te_samples}")
 
 # Store the new main DataFrame to a TSV
-main_df_outfile = os.path.join(derivatives_path, "{yaml_name}.tsv")
+main_df_outfile = os.path.join(derivatives_path, f"{yaml_name}.tsv")
 main_df.to_csv(main_df_outfile, sep='\t', index=False)
 print(f'\nStored splits data in "{main_df_outfile}"')
 
@@ -254,5 +266,9 @@ created with all the informaton about the samples.
 """
 
 yaml_outfile = os.path.join(subjects_path, f"{yaml_name}.yaml")
-create_ecvl_yaml(main_df, yaml_outfile, target_labels)
+stats_dict = create_ecvl_yaml(main_df, yaml_outfile, target_labels, multiclass)
 print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
+
+print("\nYAML labels count:")
+for label in stats_dict:
+    print(f" - {label}: {stats_dict[label]}")
