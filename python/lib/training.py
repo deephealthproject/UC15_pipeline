@@ -193,4 +193,4 @@ def train(model: eddl.Model,
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
 
-        return []  # TODO History list
+    return []  # TODO History list
