@@ -42,3 +42,9 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Output files from the pipeline
+models_ckpts/
+plots/
+smodel.pdf
+tmp.dot
