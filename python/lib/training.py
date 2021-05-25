@@ -6,7 +6,6 @@ import argparse
 import random
 
 from tqdm import tqdm
-
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 from pyeddl.tensor import Tensor
@@ -101,6 +100,7 @@ def shuffle_training_split(dataset: ecvl.DLDataset):
 
 def train(model: eddl.Model,
           dataset: ecvl.DLDataset,
+          exp_name: str,
           args: argparse.Namespace) -> list:
     """
     Executes the main training loop. Performs training, validation and model
@@ -110,6 +110,8 @@ def train(model: eddl.Model,
         model: EDDL model to train. Must be already built.
 
         dataset: ECVL dataset to load the data for training.
+
+        exp_name: Name of the training experiment.
 
         args: The argparse object with all the configuration data like:
               batch_size, epochs...
@@ -127,11 +129,10 @@ def train(model: eddl.Model,
     x = Tensor([args.batch_size, *args.in_shape])  # Images
     y = Tensor([args.batch_size, args.num_classes])  # Labels
 
+    # To store and return the training results
+    history = {"loss": [], "acc": [], "val_loss": [], "val_acc": []}
     best_acc = 0.0  # To track the best model
 
-    # Experiment name
-    exp_name = (f"{args.model}_DA-{args.augmentations}_opt-{args.optimizer}"
-                f"_lr-{args.learning_rate}")
     # Check that the ckpts folder exists
     os.makedirs(args.models_ckpts, exist_ok=True)
 
@@ -164,6 +165,10 @@ def train(model: eddl.Model,
             # Log in the progress bar
             pbar.set_postfix({"loss": losses[0], "acc": metrics[0]})
 
+        # Save the epoch results of the train split
+        history["loss"].append(losses[0])
+        history["acc"].append(metrics[0])
+
         ####################
         # Validation phase #
         ####################
@@ -186,6 +191,10 @@ def train(model: eddl.Model,
             # Log in the progress bar
             pbar.set_postfix({"val_loss": losses[0], "val_acc": metrics[0]})
 
+        # Save the epoch results of the validation split
+        history["val_loss"].append(losses[0])
+        history["val_acc"].append(metrics[0])
+
         if metrics[0] > best_acc:
             best_acc = metrics[0]
             model_name = f"{exp_name}_epoch-{epoch}_acc-{best_acc:.4f}.onnx"
@@ -193,4 +202,4 @@ def train(model: eddl.Model,
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
 
-    return []  # TODO History list
+    return history

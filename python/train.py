@@ -8,6 +8,7 @@ import pyeddl.eddl as eddl
 
 from lib.training import get_augmentations, get_optimizer, train
 from lib.models import get_model
+from lib.plot_utils import plot_training_results
 
 
 def main(args):
@@ -47,7 +48,16 @@ def main(args):
 
     eddl.summary(model)  # Print the model layers
 
-    history = train(model, dataset, args)
+    # Experiment name
+    exp_name = (f"{args.model}"
+                f"_DA-{args.augmentations}"
+                f"_input-{args.target_size[0]}x{args.target_size[1]}"
+                f"_opt-{args.optimizer}"
+                f"_lr-{args.learning_rate}")
+
+    history = train(model, dataset, exp_name, args)
+
+    plot_training_results(history, exp_name, args.plots_path)
 
 
 if __name__ == "__main__":
@@ -66,7 +76,7 @@ if __name__ == "__main__":
         help="Target size to resize the images, given by height and width",
         metavar=("HEIGHT", "WIDTH"),
         nargs=2,
-        default=[512, 512],
+        default=[256, 256],
         type=int)
 
     arg_parser.add_argument(
@@ -130,6 +140,11 @@ if __name__ == "__main__":
         "--models-ckpts",
         help="Path to the folder for saving the ONNX models checkpoints",
         default="models_ckpts")
+
+    arg_parser.add_argument(
+        "--plots-path",
+        help="Path to the folder to store the training plots",
+        default="plots")
 
     arg_parser.add_argument(
         "--seed",
