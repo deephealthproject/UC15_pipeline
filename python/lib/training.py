@@ -16,21 +16,51 @@ from pyeddl.tensor import Tensor
 #####################
 
 
+def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
+    """
+    Returns the v1.0 augmentations for each split (train, val, test).
+    The v1.0 aplies some basic augmentations playing with the brightness,
+    contrast and small image rotations.
+    """
+    tr_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugRotate([-10, 10]),
+        ecvl.AugBrightness([0, 50]),
+        ecvl.AugGammaContrast([0.8, 1.2]),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    val_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    te_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    return ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
+
+
 def augmentations_v0_0(size: tuple) -> ecvl.DatasetAugmentations:
     """
     Returns the v0.0 augmentations for each split (train, val, test).
     The v0.0 is just for resizing the data, not to perform data augmentation.
     """
     tr_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
     ])
 
     val_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
     ])
 
     te_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
     ])
 
     return ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
@@ -52,6 +82,8 @@ def get_augmentations(version: str, size: tuple) -> ecvl.DatasetAugmentations:
     """
     if version == "0.0":
         return augmentations_v0_0(size)
+    if version == "1.0":
+        return augmentations_v1_0(size)
 
     raise Exception("Wrong augmentations version provided!")
 
