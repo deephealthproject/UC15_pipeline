@@ -16,20 +16,21 @@ from pyeddl.tensor import Tensor
 #####################
 
 
-def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
-    """Returns the v1.0 augmentations for each split (train, val, test)"""
-    height, width = size
-
+def augmentations_v0_0(size: tuple) -> ecvl.DatasetAugmentations:
+    """
+    Returns the v0.0 augmentations for each split (train, val, test).
+    The v0.0 is just for resizing the data, not to perform data augmentation.
+    """
     tr_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim((height, width), ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
     ])
 
     val_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim((height, width), ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
     ])
 
     te_augs = ecvl.SequentialAugmentationContainer([
-        ecvl.AugResizeDim((height, width), ecvl.InterpolationType.cubic)
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic)
     ])
 
     return ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
@@ -49,8 +50,8 @@ def get_augmentations(version: str, size: tuple) -> ecvl.DatasetAugmentations:
         A ecvl.DatasetAugmentations object that defines the augmentations for
         each split of the dataset.
     """
-    if version == "v1.0":
-        return augmentations_v1_0(size)
+    if version == "0.0":
+        return augmentations_v0_0(size)
 
     raise Exception("Wrong augmentations version provided!")
 

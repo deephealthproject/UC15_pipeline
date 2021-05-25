@@ -95,8 +95,9 @@ if __name__ == "__main__":
 
     arg_parser.add_argument(
         "--augmentations", "-augs",
-        help="Set of augmentations to select. Versions available: v1.0",
-        default="v1.0",
+        help="Set of augmentations to select",
+        default="0.0",
+        choices=["0.0"],
         type=str)
 
     arg_parser.add_argument(
