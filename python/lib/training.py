@@ -4,6 +4,7 @@ Module with utility functions for the training pipeline.
 import os
 import argparse
 import random
+import time
 
 from tqdm import tqdm
 import pyecvl.ecvl as ecvl
@@ -153,17 +154,28 @@ def train(model: eddl.Model,
         eddl.reset_loss(model)
 
         pbar = tqdm(range(1, n_train_batches+1))
-        pbar.set_description("Training")
+        # To track the average load and training time for each batch
+        load_time = 0
+        train_time = 0
         for batch in pbar:
             # Load batch of data
+            load_start = time.perf_counter()
             dataset.LoadBatch(x, y)
+            load_end = time.perf_counter()
+            load_time += load_end - load_start
             # Perform training with batch: forward and backward
+            train_start = time.perf_counter()
             eddl.train_batch(model, [x], [y])
+            train_end = time.perf_counter()
+            train_time += train_end - train_start
             # Get current metrics
             losses = eddl.get_losses(model)
             metrics = eddl.get_metrics(model)
             # Log in the progress bar
-            pbar.set_postfix({"loss": losses[0], "acc": metrics[0]})
+            pbar.set_description(
+                f"Training[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
+            pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                              "avg_train_time": f"{train_time / batch:.3f}s"})
 
         # Save the epoch results of the train split
         history["loss"].append(losses[0])
@@ -179,17 +191,28 @@ def train(model: eddl.Model,
         eddl.reset_loss(model)
 
         pbar = tqdm(range(1, n_val_batches+1))
-        pbar.set_description("Validation")
+        # To track the average load and evaluation time for each batch
+        load_time = 0
+        eval_time = 0
         for batch in pbar:
             # Load batch of data
+            load_start = time.perf_counter()
             dataset.LoadBatch(x, y)
+            load_end = time.perf_counter()
+            load_time += load_end - load_start
             # Perform forward computations
+            eval_start = time.perf_counter()
             eddl.eval_batch(model, [x], [y])
+            eval_end = time.perf_counter()
+            eval_time += eval_end - eval_start
             # Get current metrics
             losses = eddl.get_losses(model)
             metrics = eddl.get_metrics(model)
             # Log in the progress bar
-            pbar.set_postfix({"val_loss": losses[0], "val_acc": metrics[0]})
+            pbar.set_description(
+                f"Validation[val_loss={losses[0]:.4f}, val_acc={metrics[0]:.4f}]")
+            pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                              "avg_eval_time": f"{eval_time / batch:.3f}s"})
 
         # Save the epoch results of the validation split
         history["val_loss"].append(losses[0])

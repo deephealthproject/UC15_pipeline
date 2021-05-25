@@ -2,6 +2,7 @@
 Main script to train the models.
 """
 import argparse
+from datetime import datetime
 
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
@@ -49,7 +50,9 @@ def main(args):
     eddl.summary(model)  # Print the model layers
 
     # Experiment name
-    exp_name = (f"{args.model}"
+    exp_strftime = datetime.now().strftime("%d-%b_%H:%M")
+    exp_name = (f"{exp_strftime}"
+                f"_net-{args.model}"
                 f"_DA-{args.augmentations}"
                 f"_input-{args.target_size[0]}x{args.target_size[1]}"
                 f"_opt-{args.optimizer}"

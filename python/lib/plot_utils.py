@@ -30,7 +30,8 @@ def plot_training_results(history: dict, exp_name: str, plots_path: str):
         plt.title(f"Training {name}")
         plt.ylabel(name)
         plt.xlabel("epoch")
-        plt.xticks(range(1, len(history[metric])+1))
+        n_epochs = len(history[metric])
+        plt.xticks(range(n_epochs), range(1, n_epochs+1))
         plt.legend()
         plt.savefig(os.path.join(plots_path, f"{name}_{exp_name}.png"))
         plt.clf()  # Clear figure for the next plot
