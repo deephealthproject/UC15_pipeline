@@ -109,8 +109,9 @@ if __name__ == "__main__":
         "--model",
         help="Model architecture to train",
         default="model_1",
-        choices=["model_1"],
-        type=str)
+        type=str,
+        choices=["model_1",
+                 "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152"])
 
     arg_parser.add_argument(
         "--optimizer", "-opt",
