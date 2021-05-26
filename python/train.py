@@ -7,7 +7,7 @@ from datetime import datetime
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 
-from lib.training import get_augmentations, get_optimizer, train
+from lib.training import get_augmentations, get_optimizer, train, test
 from lib.models import get_model
 from lib.plot_utils import plot_training_results
 
@@ -62,6 +62,11 @@ def main(args):
 
     plot_training_results(history, exp_name, args.plots_path)
 
+    test_results = test(model, dataset, args)
+
+    print(("Test results: "
+          f"loss={test_results['loss']:.4f} - acc={test_results['acc']:.4f}"))
+
 
 if __name__ == "__main__":
     # Get the config from the script arguments
@@ -97,7 +102,7 @@ if __name__ == "__main__":
         "--augmentations", "-augs",
         help="Set of augmentations to select",
         default="0.0",
-        choices=["0.0", "1.0"],
+        choices=["0.0", "1.0", "1.1"],
         type=str)
 
     arg_parser.add_argument(

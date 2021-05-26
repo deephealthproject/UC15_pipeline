@@ -19,7 +19,7 @@ from pyeddl.tensor import Tensor
 def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
     """
     Returns the v1.0 augmentations for each split (train, val, test).
-    The v1.0 aplies some basic augmentations playing with the brightness,
+    The v1.0 applies some basic augmentations playing with the brightness,
     contrast and small image rotations.
     """
     tr_augs = ecvl.SequentialAugmentationContainer([
@@ -27,6 +27,33 @@ def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
         ecvl.AugRotate([-10, 10]),
         ecvl.AugBrightness([0, 50]),
         ecvl.AugGammaContrast([0.8, 1.2]),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    val_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    te_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    return ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
+
+
+def augmentations_v1_1(size: tuple) -> ecvl.DatasetAugmentations:
+    """
+    Returns the v1.1 augmentations for each split (train, val, test).
+    The v1.1 applies the same augmentations than the v1.0 but more
+    aggressively.
+    """
+    tr_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugRotate([-15, 15]),
+        ecvl.AugBrightness([0, 70]),
+        ecvl.AugGammaContrast([0.6, 1.4]),
         ecvl.AugToFloat32(255.0)
     ])
 
@@ -84,6 +111,8 @@ def get_augmentations(version: str, size: tuple) -> ecvl.DatasetAugmentations:
         return augmentations_v0_0(size)
     if version == "1.0":
         return augmentations_v1_0(size)
+    if version == "1.1":
+        return augmentations_v1_1(size)
 
     raise Exception("Wrong augmentations version provided!")
 
@@ -172,7 +201,7 @@ def train(model: eddl.Model,
 
     random.seed(args.seed)  # Seed for shuffling the data
 
-    print(f"Going to traing for {args.epochs} epochs:")
+    print(f"Going to train for {args.epochs} epochs:")
     for epoch in range(1, args.epochs+1):
         print(f"Epoch {epoch}:")
         ##################
@@ -257,5 +286,70 @@ def train(model: eddl.Model,
             model_path = os.path.join(args.models_ckpts, model_name)
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
+
+    return history
+
+
+def test(model: eddl.Model,
+         dataset: ecvl.DLDataset,
+         args: argparse.Namespace) -> list:
+    """
+    Performs the model evaluation with the test split.
+
+    Args:
+        model: Trained EDDL model to test.
+
+        dataset: ECVL dataset to load the data (from test split).
+
+        args: The argparse object with all the configuration data like:
+              batch_size, epochs...
+
+    Returns:
+        A dictionary with a summary of the testing phase.
+    """
+    n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
+    n_test_batches = n_test_samples // args.batch_size
+
+    # Create auxiliary tensors to load the data
+    x = Tensor([args.batch_size, *args.in_shape])  # Images
+    y = Tensor([args.batch_size, args.num_classes])  # Labels
+
+    # To store and return the testing results
+    history = {"loss": [], "acc": []}
+
+    # Prepare dataset
+    dataset.SetSplit(ecvl.SplitType.test)
+    dataset.ResetAllBatches()
+
+    eddl.reset_loss(model)
+
+    print("Testing:")
+    pbar = tqdm(range(1, n_test_batches+1))
+    # To track the average load and testing time for each batch
+    load_time = 0
+    test_time = 0
+    for batch in pbar:
+        # Load batch of data
+        load_start = time.perf_counter()
+        dataset.LoadBatch(x, y)
+        load_end = time.perf_counter()
+        load_time += load_end - load_start
+        # Perform forward computations
+        test_start = time.perf_counter()
+        eddl.eval_batch(model, [x], [y])
+        test_end = time.perf_counter()
+        test_time += test_end - test_start
+        # Get current metrics
+        losses = eddl.get_losses(model)
+        metrics = eddl.get_metrics(model)
+        # Log in the progress bar
+        pbar.set_description(
+            f"Test[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
+        pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                          "avg_test_time": f"{test_time / batch:.3f}s"})
+
+    # Save test results
+    history["loss"].append(losses[0])
+    history["acc"].append(metrics[0])
 
     return history
