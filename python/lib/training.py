@@ -315,7 +315,7 @@ def test(model: eddl.Model,
     y = Tensor([args.batch_size, args.num_classes])  # Labels
 
     # To store and return the testing results
-    history = {"loss": [], "acc": []}
+    history = {"loss": -1, "acc": -1}
 
     # Prepare dataset
     dataset.SetSplit(ecvl.SplitType.test)
@@ -349,7 +349,7 @@ def test(model: eddl.Model,
                           "avg_test_time": f"{test_time / batch:.3f}s"})
 
     # Save test results
-    history["loss"].append(losses[0])
-    history["acc"].append(metrics[0])
+    history["loss"] = losses[0]
+    history["acc"] = metrics[0]
 
     return history

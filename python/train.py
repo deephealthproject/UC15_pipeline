@@ -58,14 +58,17 @@ def main(args):
                 f"_opt-{args.optimizer}"
                 f"_lr-{args.learning_rate}")
 
+    # Train the model
     history = train(model, dataset, exp_name, args)
 
+    # Create the plots of the training curves for loss and accuracy
     plot_training_results(history, exp_name, args.plots_path)
 
+    # Inference on test split
     test_results = test(model, dataset, args)
-
-    print(("Test results: "
-          f"loss={test_results['loss']:.4f} - acc={test_results['acc']:.4f}"))
+    test_loss = test_results['loss']
+    test_acc = test_results['acc']
+    print(f"Test results: loss={test_loss:.4f} - acc={test_acc:.4f}")
 
 
 if __name__ == "__main__":
