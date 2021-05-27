@@ -73,11 +73,11 @@ def shortcut(in_layer, residual):
         The reference to the Add layer that performs the shortcut.
     """
     # Check if the shapes match
-    in_ch, in_h, in_w = eddl.getOutput(in_layer).getShape()[-3:]
-    res_ch, res_h, res_w = eddl.getOutput(residual).getShape()[-3:]
+    in_ch, in_h, in_w = in_layer.output.shape[-3:]
+    res_ch, res_h, res_w = residual.output.shape[-3:]
     # The stride values should be integers after division
-    stride_h = in_h // in_h
-    stride_w = in_w // in_w
+    stride_h = in_h // res_h
+    stride_w = in_w // res_w
     eq_channels = in_ch == res_ch
 
     shortcut = in_layer
