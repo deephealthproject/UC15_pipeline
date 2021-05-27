@@ -1,6 +1,7 @@
 """
 Main script to train the models.
 """
+import os
 import argparse
 from datetime import datetime
 
@@ -28,8 +29,14 @@ def main(args):
     args.in_shape = in_shape
     args.num_classes = num_classes
 
-    # Create the model
-    model = get_model(args.model, in_shape, num_classes)
+    if args.model_ckpt:
+        # Load the model from an ONNX file
+        model = eddl.import_net_from_onnx_file(args.model_ckpt)
+        init_weights = False  # Avoid resetting the loaded weights
+    else:
+        # Create the model
+        model = get_model(args.model, in_shape, num_classes)
+        init_weights = True
 
     # Create the optimizer
     opt = get_optimizer(args.optimizer, args.learning_rate)
@@ -45,7 +52,8 @@ def main(args):
                opt,
                ["softmax_cross_entropy"],
                ['accuracy'],
-               comp_serv)
+               comp_serv,
+               init_weights)
 
     eddl.summary(model)  # Print the model layers
 
@@ -57,6 +65,11 @@ def main(args):
                 f"_input-{args.target_size[0]}x{args.target_size[1]}"
                 f"_opt-{args.optimizer}"
                 f"_lr-{args.learning_rate}")
+
+    if args.model_ckpt:
+        # Get the name by taking the filename and removing the .onnx extension
+        ckpt_name = os.path.basename(args.model_ckpt)[:-5]
+        exp_name += f"_ckpt-{ckpt_name}"
 
     # Train the model
     history = train(model, dataset, exp_name, args)
@@ -164,5 +177,10 @@ if __name__ == "__main__":
         help="Seed value for random operations",
         default=1234,
         type=int)
+
+    arg_parser.add_argument(
+        "--model-ckpt",
+        help="An ONNX model checkpoint to start training from",
+        type=str)
 
     main(arg_parser.parse_args())
