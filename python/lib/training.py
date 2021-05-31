@@ -194,7 +194,8 @@ def train(model: eddl.Model,
 
     # To store and return the training results
     history = {"loss": [], "acc": [], "val_loss": [], "val_acc": []}
-    best_acc = 0.0  # To track the best model
+    best_loss = float('inf')  # To track the best model
+    best_acc = 0.0
 
     # Check that the ckpts folder exists
     os.makedirs(args.models_ckpts, exist_ok=True)
@@ -280,9 +281,11 @@ def train(model: eddl.Model,
         history["val_loss"].append(losses[0])
         history["val_acc"].append(metrics[0])
 
-        if metrics[0] > best_acc:
+        if losses[0] < best_loss:
+            best_loss = losses[0]
             best_acc = metrics[0]
-            model_name = f"{exp_name}_epoch-{epoch}_acc-{best_acc:.4f}.onnx"
+            model_name = (f"{exp_name}_epoch-{epoch}_"
+                          f"loss-{best_loss:.4f}_acc-{best_acc:.4f}.onnx")
             model_path = os.path.join(args.models_ckpts, model_name)
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
