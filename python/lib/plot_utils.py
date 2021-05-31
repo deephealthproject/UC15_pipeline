@@ -5,7 +5,6 @@ import os
 import math
 from typing import Tuple
 
-import numpy as np
 from matplotlib import pyplot as plt
 
 
@@ -33,7 +32,10 @@ def plot_training_results(history: dict, exp_name: str, plots_path: str):
         plt.ylabel(name)
         plt.xlabel("epoch")
         n_epochs = len(history[metric])
-        plt.xticks(range(n_epochs), range(1, n_epochs+1))
+        if n_epochs > 15:
+            plt.xticks(range(0, n_epochs+1, 5))
+        else:
+            plt.xticks(range(n_epochs))
         plt.legend()
         plt.savefig(os.path.join(exp_plots_path, f"{name}_{exp_name}.png"))
         plt.clf()  # Clear figure for the next plot
