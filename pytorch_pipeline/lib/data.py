@@ -83,7 +83,13 @@ class COVIDDataset(torch.utils.data.Dataset):
         if self.trans:
             img = self.trans(image=img)["image"]
 
-        return img, sample_row['labels']
+        # Prepare the torch tensors
+        img = torch.tensor(img)
+        img = img.view((1, *img.shape))  # Add the channel dimension
+
+        label = torch.tensor(sample_row['labels'])
+
+        return img, label
 
 
 class COVIDDataModule(pl.LightningDataModule):
@@ -170,7 +176,7 @@ class COVIDDataModule(pl.LightningDataModule):
             trans = get_augmentations(self.augs_version, self.target_size)
             self.train_dataset = COVIDDataset(train, trans)
 
-        if stage in (None, 'validate'):
+        if stage in (None, 'validate', 'fit'):
             val = data_df[data_df["split"] == "validation"]
             no_da_trans = get_augmentations("0.0", self.target_size)
             self.val_dataset = COVIDDataset(val, no_da_trans)
@@ -188,14 +194,14 @@ class COVIDDataModule(pl.LightningDataModule):
                                            pin_memory=self.pin_memory)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset,
+        return torch.utils.data.DataLoader(self.val_dataset,
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,
                                            pin_memory=self.pin_memory)
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset,
+        return torch.utils.data.DataLoader(self.test_dataset,
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,

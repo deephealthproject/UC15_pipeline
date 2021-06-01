@@ -2,11 +2,13 @@
 Script for training the models using Pytorch.
 """
 import argparse
+import multiprocessing
 
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from lib.data import COVIDDataModule
+from lib.models import get_model
 
 
 def main(args):
@@ -18,7 +20,15 @@ def main(args):
                                   args.batch_size,
                                   shuffle=True,
                                   target_size=args.target_size,
-                                  augmentations=args.augmentations)
+                                  augmentations=args.augmentations,
+                                  num_workers=args.num_workers,
+                                  pin_memory=True)
+
+    # Create the model
+    model = get_model(args.model,
+                      (1, *args.target_size),  # Input shape
+                      len(args.labels),  # Number of classes
+                      args)
 
     # Prepare training callbacks
     ckpt_callback = ModelCheckpoint(dirpath=args.models_ckpts,
@@ -28,7 +38,12 @@ def main(args):
     # Create the object to configure and execute training
     trainer = Trainer(gpus=args.gpus,
                       deterministic=True,  # For reproducibility
-                      callbacks=[ckpt_callback])
+                      callbacks=[ckpt_callback],
+                      max_epochs=args.epochs)
+
+    trainer.fit(model, datamodule=data_module)
+
+    trainer.test(model, datamodule=data_module)
 
 
 if __name__ == "__main__":
@@ -72,6 +87,26 @@ if __name__ == "__main__":
         type=int)
 
     arg_parser.add_argument(
+        "--model",
+        help="Model architecture to train",
+        default="ResNet18",
+        type=str,
+        choices=["ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152"])
+
+    arg_parser.add_argument(
+        "--optimizer", "-opt",
+        help="Training optimizer",
+        default="Adam",
+        choices=["Adam", "SGD"],
+        type=str)
+
+    arg_parser.add_argument(
+        "--learning-rate", "-lr",
+        help="Learning rate of the optimizer",
+        default=0.001,
+        type=float)
+
+    arg_parser.add_argument(
         "--augmentations", "-augs",
         help="Set of augmentations to select",
         default="0.0",
@@ -82,6 +117,12 @@ if __name__ == "__main__":
         "--gpus",
         help="Number of gpus to use during training",
         default=1,
+        type=int)
+
+    arg_parser.add_argument(
+        "--num-workers",
+        help="Number of processes to load the data.",
+        default=multiprocessing.cpu_count(),
         type=int)
 
     arg_parser.add_argument(
