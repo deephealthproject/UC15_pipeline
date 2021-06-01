@@ -1,5 +1,6 @@
 """
-Module with the classes for creating the data generator for training.
+Module with the classes for creating the data generators and the utilities to
+perform data augmentation.
 """
 import os
 import ast

@@ -14,6 +14,7 @@ from pytorch_lightning.metrics.functional import accuracy
 ##########
 # ResNet #
 ##########
+
 class Flatten(nn.Module):
     """
     Wrapper module to perform a flatten operation.
@@ -25,7 +26,7 @@ class Flatten(nn.Module):
 
 
 class ConvBNReLU(nn.Module):
-    """ 
+    """
     Module to create the sequence of layers Conv2D -> BatchNorm -> ReLU
     """
 
@@ -35,7 +36,7 @@ class ConvBNReLU(nn.Module):
                  kernel_size: tuple = (3, 3),
                  stride: tuple = 1,
                  padding: int = 1):
-        """ 
+        """
         Constructor.
 
         Args:
@@ -60,7 +61,7 @@ class ConvBNReLU(nn.Module):
 
 
 class BNReLUConv(nn.Module):
-    """ 
+    """
     Module to create the sequence of layers BatchNorm -> ReLU -> Conv2D
     """
 
@@ -70,7 +71,7 @@ class BNReLUConv(nn.Module):
                  kernel_size: tuple = (3, 3),
                  stride: tuple = 1,
                  padding: tuple = 1):
-        """ 
+        """
         Constructor.
 
         Args:
@@ -95,7 +96,7 @@ class BNReLUConv(nn.Module):
 
 
 class Shortcut(nn.Module):
-    """ 
+    """
     Module to build the shortcut connection at the end of each block.
     This module can add a Conv2d layer to fix the input shape of the
     input tensor to match the shape of the residual tensor.
@@ -367,11 +368,11 @@ class ResNet(pl.LightningModule):
         layers = []
         in_channels = 64
         filters = 64
-        for block_idx, n_blocks in enumerate(n_blocks):
+        for block_idx, blocks in enumerate(n_blocks):
             layers.append(ResidualBlock(in_channels,
                                         bottleneck_block,
                                         filters,
-                                        n_blocks,
+                                        blocks,
                                         is_first_layer=(block_idx == 0)))
             if bottleneck_block:
                 in_channels = filters * 4
@@ -411,7 +412,8 @@ class ResNet(pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         acc = accuracy(logits, y)
 
-        self.log('train_loss', loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log('train_loss', loss, prog_bar=True,
+                 on_step=False, on_epoch=True)
         self.log('train_acc', acc, prog_bar=True, on_step=False, on_epoch=True)
 
         return loss  # Pytorch Lightning handles the backward

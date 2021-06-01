@@ -39,10 +39,13 @@ def main(args):
     trainer = Trainer(gpus=args.gpus,
                       deterministic=True,  # For reproducibility
                       callbacks=[ckpt_callback],
-                      max_epochs=args.epochs)
+                      max_epochs=args.epochs,
+                      profiler=args.profiler)
 
+    # Train the model
     trainer.fit(model, datamodule=data_module)
 
+    # Test with test split
     trainer.test(model, datamodule=data_module)
 
 
@@ -135,5 +138,11 @@ if __name__ == "__main__":
         "--models-ckpts",
         help="Path to the folder for saving the ONNX models checkpoints",
         default="models_ckpts")
+
+    arg_parser.add_argument(
+        "--profiler",
+        help="Selects a performance profiler to test the pipeline",
+        choices=["simple", "advanced"],
+        default=None)
 
     main(arg_parser.parse_args())
