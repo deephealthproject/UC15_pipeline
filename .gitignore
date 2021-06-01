@@ -48,3 +48,6 @@ models_ckpts/
 plots/
 smodel.pdf
 tmp.dot
+
+# Pytorch pipeline
+lightning_logs/
