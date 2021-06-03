@@ -46,6 +46,7 @@ dmypy.json
 # Output files from the pipeline
 models_ckpts/
 plots/
+logs/
 smodel.pdf
 tmp.dot
 
