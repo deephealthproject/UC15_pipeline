@@ -412,9 +412,8 @@ class ResNet(pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         acc = accuracy(logits, y)
 
-        self.log('train_loss', loss, prog_bar=True,
-                 on_step=False, on_epoch=True)
-        self.log('train_acc', acc, prog_bar=True, on_step=False, on_epoch=True)
+        self.log('train_loss', loss, prog_bar=True, logger=True)
+        self.log('train_acc', acc, prog_bar=True, logger=True)
 
         return loss  # Pytorch Lightning handles the backward
 
@@ -428,8 +427,8 @@ class ResNet(pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         acc = accuracy(logits, y)
 
-        self.log('val_loss', loss, prog_bar=True)
-        self.log('val_acc', acc, prog_bar=True)
+        self.log('val_loss', loss, prog_bar=True, logger=True)
+        self.log('val_acc', acc, prog_bar=True, logger=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -441,8 +440,8 @@ class ResNet(pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         acc = accuracy(logits, y)
 
-        self.log('test_loss', loss, prog_bar=True)
-        self.log('test_acc', acc, prog_bar=True)
+        self.log('test_loss', loss, prog_bar=True, logger=True)
+        self.log('test_acc', acc, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
         if self.optimizer == "Adam":

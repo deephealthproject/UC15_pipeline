@@ -1,11 +1,14 @@
 """
 Script for training the models using Pytorch.
 """
+import os
 import argparse
 import multiprocessing
+from datetime import datetime
 
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from lib.data import COVIDDataModule
 from lib.models import get_model
@@ -35,12 +38,26 @@ def main(args):
                                     monitor="val_loss",
                                     save_top_k=1)
 
+    # Experiment name
+    exp_strftime = datetime.now().strftime("%d-%b_%H:%M")
+    exp_name = (f"{exp_strftime}"
+                f"_net-{args.model}"
+                f"_DA-{args.augmentations}"
+                f"_input-{args.target_size[0]}x{args.target_size[1]}"
+                f"_opt-{args.optimizer}"
+                f"_lr-{args.learning_rate}")
+
+    # Prepare the logger
+    os.makedirs(args.logs, exist_ok=True)
+    logger = TensorBoardLogger(args.logs, name=exp_name)
+
     # Create the object to configure and execute training
     trainer = Trainer(gpus=args.gpus,
                       deterministic=True,  # For reproducibility
                       callbacks=[ckpt_callback],
                       max_epochs=args.epochs,
-                      profiler=args.profiler)
+                      profiler=args.profiler,
+                      logger=logger)
 
     # Train the model
     trainer.fit(model, datamodule=data_module)
@@ -135,14 +152,19 @@ if __name__ == "__main__":
         type=int)
 
     arg_parser.add_argument(
+        "--profiler",
+        help="Selects a performance profiler to test the pipeline",
+        choices=["simple", "advanced"],
+        default=None)
+
+    arg_parser.add_argument(
         "--models-ckpts",
         help="Path to the folder for saving the ONNX models checkpoints",
         default="models_ckpts")
 
     arg_parser.add_argument(
-        "--profiler",
-        help="Selects a performance profiler to test the pipeline",
-        choices=["simple", "advanced"],
-        default=None)
+        "--logs",
+        help="Path to the folder for saving the training logs",
+        default="logs")
 
     main(arg_parser.parse_args())
