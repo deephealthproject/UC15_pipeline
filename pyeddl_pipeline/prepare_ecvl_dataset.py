@@ -61,6 +61,9 @@ def main(args):
 
         2 - The selected samples must be also anterior-posterior (AP) or
             posterior-anterior (PA) views.
+
+        3 - If the clean-data argument is provided. We only take the images
+            that are labeled as "OK".
     """
 
     # 1 - Filter by labels
@@ -87,6 +90,17 @@ def main(args):
     samples_filter = part_df.apply(is_ap_or_pa, axis=1)  # Rows mask filter
     selected_samples = part_df[samples_filter]
     n_selected = len(selected_samples.index)
+
+    # 3 - Get only the images that are manually validated
+    if args.clean_data:
+        # Load the dataframe with the annotations
+        clean_df = pd.read_csv(args.clean_data, sep='\t')
+        # Take only the samples that are "OK"
+        ok_samples = clean_df[clean_df["status"] == "OK"]
+        # Create the filter to take the "OK" samples only
+        ok_filter = selected_samples["session"].isin(ok_samples["session"])
+        # Apply the filter
+        selected_samples = selected_samples[ok_filter]
 
     """
     Create the DataFrame with all the relevant info for each sample.
@@ -228,6 +242,12 @@ if __name__ == "__main__":
         "--data-path",
         help="Path to the folder with the subjects data",
         default="../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/")
+
+    arg_parser.add_argument(
+        "--clean-data",
+        help=("Path to the TSV file with the annotations generated wit the "
+              "data_cleaning.ipynb notebook"),
+        default=None)
 
     arg_parser.add_argument(
         "--seed",
