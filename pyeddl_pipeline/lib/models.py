@@ -115,11 +115,18 @@ def basic_block(in_layer,  # A EDDL Layer
     Returns:
         A reference to the last layer of the block (after the shortcut).
     """
+    l = in_layer  # Aux layer to save the input reference for the shortcut
+    if strides == (2, 2):
+        l = eddl.Pad(l, [0, 1, 1, 0])  # Fix asymmetric padding
+        padding = "valid"
+    else:
+        padding = "same"
+
     if is_first_layer:
         # Avoid preactivation
-        l = eddl.Conv(in_layer, filters, (3, 3), strides, "same")
+        l = eddl.Conv(l, filters, (3, 3), strides, padding)
     else:
-        l = bn_relu_conv(in_layer, filters, (3, 3), strides, "same")
+        l = bn_relu_conv(l, filters, (3, 3), strides, padding)
 
     residual = bn_relu_conv(l, filters, (3, 3), (1, 1), "same")
 
@@ -221,8 +228,10 @@ def build_resnet(in_shape: tuple,
     """
     in_ = eddl.Input(in_shape)
     # First conv block before the resiual blocks
-    l = conv_bn_relu(in_, 64, (7, 7), (2, 2))
-    l = eddl.MaxPool2D(l, (3, 3), (2, 2), "same")
+    l = eddl.Pad(in_, [3, 3, 3, 3])  # Fix asymmetric padding
+    l = conv_bn_relu(l, 64, (7, 7), (2, 2), "valid")
+    l = eddl.Pad(l, [1, 1, 1, 1])  # Fix asymmetric padding
+    l = eddl.MaxPool2D(l, (3, 3), (2, 2), "valid")
 
     # Build residual blocks
     filters = 64
