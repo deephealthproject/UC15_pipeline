@@ -1,6 +1,8 @@
 # UC15 - BIMCV COVID 19+ pipeline
 This repository contains all the code developed for analyzing and processing the data, and the Deep Learning pipelines implemented using ECVL and EDDL to perform a classification task with chest X-ray images to detect COVID 19 cases and other pathologies.
 
+It also contains a replica of the ECVL+EDDL pipeline using Pytorch.
+
 # Dataset
 You can find the BIMCV COVID 19+ dataset [here](https://bimcv.cipf.es/bimcv-projects/bimcv-covid19/). Note that there are two versions: "Iteration 1" and "Iteration 1 + 2". Download the "Iteration 1 + 2" version.
 
@@ -27,16 +29,25 @@ The aditional depencencies are listed in the **requirements.txt** file. You can 
 pip install -r requirements.txt
 ```
 
+If you are going to try the Pytorch pipeline you will also need to install the dependencies of that pipeline:
+
+```bash
+pip install -r pytorch_requirements.txt
+```
+
 # Notebooks and Scripts
 
-Inside the *python* folder you can find all the notebooks and scripts developed in Python. 
+Inside the *pyeddl_pipeline* folder you can find all the notebooks and scripts developed to build the pipeline using EDDL and ECVL.
 
-#### **Important:** To run the Python scripts you must execute them from the *python* folder in order to avoid problems when importing some Python modules.
+The *pytorch_pipeline* folder contains a replica of the pyeddl pipeline using Pytorch instead. Note that the notebooks used to analyze the data are only present in the *pyeddl_pipeline* folder.
+
+#### **Important:** To run the Python scripts you must execute them from the corresponding pipeline folder in order to avoid problems when importing some Python modules.
 
 Quick notebooks and scripts guide:
 
 - **data_exploration.ipynb**: A notebook with a full dataset exploration. It analyzes the images, the available metadada and labels in order to get the most value out of them.
 - **images_visualization.ipynb**: The aim of this notebook is tho show images. You can view random sampled images or you can select images by subject or session. It also shows the changes after applying some preprocessing to the images.
+- **data_cleaning.ipynb**: This notebook provides an interface to easily label the samples as valid or not. The labels generated are stored in a TSV that can be passed to the "prepare_ecvl_dataset.py" script to only take the samples that are valid.
 - **prepare_ecvl_dataset.py**: This script collects the needed data to prepare a YAML file for the ECVL to create a Dataset (ECVL object to load the data) for training the models. This script prepares the labels, aditional metadata and defines the dataset splits (train, validation, test).
 
 Note: The Python scripts can be run with the **-h** flag to see possible configuration arguments. You probably need to use these arguments to designate where you have decompressed the dataset.
