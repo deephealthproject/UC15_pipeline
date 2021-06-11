@@ -20,21 +20,16 @@ from lib.image_processing import histogram_equalization
 def main(args):
     np.random.seed(args.seed)  # Set the random seed for Numpy
 
-    target_labels = args.labels  # Training labels
-    multiclass = args.multiclass
-
-    splits_sizes = args.splits
-    assert sum(splits_sizes) == 1, "The splits values sum must be 1.0!"
+    assert sum(args.splits) == 1, "The splits values sum must be 1.0!"
 
     # Name of the directory to store the preprocessed images. It will be
     # created inside the subjects data folder ("covid19_posi").
-    preproc_dirname = "preprocessed_data"
+    preproc_dirname = f"{args.yaml_name}_preproc_data"
 
     """
     Load and prepare data
     """
-    subjects_path = args.data_path
-    derivatives_path = os.path.join(subjects_path, "derivatives")  # Aux path
+    derivatives_path = os.path.join(args.sub_path, "derivatives")  # Aux path
 
     # Load DataFrame with all the images (paths) by session and subject
     partitions_tsv_path = os.path.join(derivatives_path, "partitions.tsv")
@@ -50,14 +45,115 @@ def main(args):
     labels_df["Labels"] = labels_df["Labels"].apply(get_labels_from_str)
 
     # Load DataFrame with informaton about the subjects
-    subjects_tsv_path = os.path.join(subjects_path, "participants.tsv")
+    subjects_tsv_path = os.path.join(args.sub_path, "participants.tsv")
     subjects_df = pd.read_csv(subjects_tsv_path, sep="\t")
+
+    """
+    Use the results from the tests (like PCR) to change the labels.
+
+    Note: There are samples that are not labeled as "COVID 19" but the
+          corresponding test for that subject for the same date of the
+          scan (or a close day) is positive. So for some cases like
+          "COVID 19 uncertain" or "pneumonia" is interesting to label
+          those images as "COVID 19" (if the test is positive).
+    """
+
+    if not args.no_relabel:
+        # Load the results of the COVID tests
+        tests_path = os.path.join(args.sub_path,
+                                  "derivatives/EHR/sil_reg_covid_posi.tsv")
+        tests_df = pd.read_csv(tests_path, sep='\t')
+
+        # Get only the tests that are positive
+        posi_tests = tests_df[tests_df["result"] == "POSITIVO"].copy()
+        # Convert dates from strings to datetime objects
+        posi_tests["date"] = pd.to_datetime(posi_tests["date"],
+                                            format="%d.%m.%Y")
+        # Group tests by subject ID
+        #  - Note: A subject can have several tests
+        posi_tests_by_sub = posi_tests.groupby(["participant"])
+
+        # Group the sessions labels by subject ID
+        labels_by_sub = labels_df.groupby(["PatientID"])
+
+        sess_labels_fixed = 0  # Counter to show stats
+
+        # Iterate over the positive tests to check if we have to relabel
+        print("Fixing labels with COVID tests results:")
+        for sub_id, sub_tests in tqdm(posi_tests_by_sub):
+            # Load subject sessions data
+            sub_sessions_tsv = os.path.join(args.sub_path,
+                                            sub_id,
+                                            f"{sub_id}_sessions.tsv")
+            # Check if the data exists
+            if not os.path.isfile(sub_sessions_tsv):
+                continue  # skip the subject
+
+            # Load the sessions data of the current subject
+            sub_sessions_df = pd.read_csv(sub_sessions_tsv, sep="\t")
+
+            # Convert sessions dates from strings to datetime objects
+            sub_sessions_df["study_date"] = pd.to_datetime(
+                sub_sessions_df["study_date"], format="%Y%m%d")
+
+            # Get the list of labels for each session of the subject
+            #  Note: "ReportID" is the session ID
+            sub_sessions_labels = labels_by_sub.get_group(sub_id)[['ReportID',
+                                                                   'Labels']]
+
+            # Compare the labels of each session with the COVID tests
+            for idx, sess_row in sub_sessions_df.iterrows():
+                sess_id = sess_row["session_id"]
+                sess_date = sess_row["study_date"]
+
+                # Get the list of labels of the current session
+                sess_mask = sub_sessions_labels["ReportID"] == sess_id
+                sess_labels_row = sub_sessions_labels[sess_mask]
+                labels_list = sess_labels_row["Labels"].values[0]
+
+                # Skip sessions with the COVID label (Nothing to change here)
+                if 'COVID 19' in labels_list:
+                    continue
+                # Skip sessions with at least one of the labels to avoid
+                if any(l in args.labels_to_avoid for l in labels_list):
+                    continue
+                # Skip sessions without at least one mandatory label
+                if len(args.mandatory_labels):
+                    # Look for a mandatory label
+                    found = False
+                    for l in labels_list:
+                        if l in args.mandatory_labels:
+                            found = True
+                            break
+                    # If not, skip the session
+                    if not found:
+                        continue
+
+                # Look if any of the tests can affect the session labels
+                for test_date in sub_tests["date"]:
+                    # Compute time difference in days
+                    days_diff = (sess_date - test_date).days
+
+                    # Check if is a valid difference to fix the label
+                    if -args.prev_days <= days_diff <= args.post_days:
+                        # Add the COVID 19 label
+                        #  Note: The extra [] are necessary
+                        new_labels = [[labels_list + ["COVID 19"]]]
+                        sessions_mask = labels_df["ReportID"] == sess_id
+                        labels_df.loc[sessions_mask, "Labels"] = new_labels
+                        sess_labels_fixed += 1
+                        break  # Don't look for more tests
+
+        print(f"Sessions with 'COVID 19' label added: {sess_labels_fixed}")
+
+    else:
+        print("Skipping the relabeling step")
 
     """
     Filter samples of interest to create the final Dataset.
 
         1 - The selected samples to create the ECVL Dataset must have at least
-            one of the labels of interest (defined in target_labels).
+            one of the labels of interest (defined in args.target_labels).
 
         2 - The selected samples must be also anterior-posterior (AP) or
             posterior-anterior (PA) views.
@@ -70,11 +166,10 @@ def main(args):
 
     def filter_by_labels(df_row: pd.Series):
         """Returns True if at least one target label is in the row labels"""
-        return any(label in df_row["Labels"] for label in target_labels)
+        return any(label in df_row["Labels"] for label in args.target_labels)
 
     # Get the rows of the DataFrame that have at least one of the target labels
-    samples_filter = labels_df.apply(
-        filter_by_labels, axis=1)  # Rows mask filter
+    samples_filter = labels_df.apply(filter_by_labels, axis=1)  # Rows mask
     selected_labels = labels_df[samples_filter]
 
     # 2 - Filter by views (AP and PA)
@@ -89,7 +184,6 @@ def main(args):
     # Get the rows of the DataFrame that are AP or PA images
     samples_filter = part_df.apply(is_ap_or_pa, axis=1)  # Rows mask filter
     selected_samples = part_df[samples_filter]
-    n_selected = len(selected_samples.index)
 
     # 3 - Get only the images that are manually validated
     if args.clean_data:
@@ -121,18 +215,18 @@ def main(args):
                                     'age'])
 
     # Prepare the folder to store the preprocessed images
-    os.makedirs(os.path.join(subjects_path, preproc_dirname), exist_ok=True)
+    os.makedirs(os.path.join(args.sub_path, preproc_dirname), exist_ok=True)
 
-    # Here we store pairs of images paths (orig, dest) of the images that we are
-    # going to preprocess. We do this to execute the preprocessing in parallel.
+    # We store the pairs of images paths (orig, dest) of the images that we are
+    # going to preprocess. We do this to execute the preprocessing in parallel
     images_to_preprocess = []
 
     # Iterate over each sample to collect the data to create the new "main_df"
     print("Collecting samples data:")
+    n_selected = len(selected_samples.index)
     for idx, row in tqdm(selected_samples.iterrows(), total=n_selected):
         sub_id = row["subject"]
         sess_id = row["session"]
-        img_path = row["filepath"]
 
         # Get the labels of the current sample
         row_labels = selected_labels[selected_labels["ReportID"] == sess_id]
@@ -148,9 +242,11 @@ def main(args):
 
         # Add the image to the preprocessing queue with the input and output
         # paths for the preprocessing function
-        orig_img_path = os.path.join(subjects_path, row['filepath'])
-        new_img_path = os.path.join(subjects_path, new_img_relative_path)
-        images_to_preprocess.append((orig_img_path, new_img_path))
+        orig_img_path = os.path.join(args.sub_path, row['filepath'])
+        new_img_path = os.path.join(args.sub_path, new_img_relative_path)
+
+        if not os.path.isfile(new_img_path) or args.new_preproc:
+            images_to_preprocess.append((orig_img_path, new_img_path))
 
         # Get subject data (age, gender...)
         sub_data = subjects_df[subjects_df["participant"] == sub_id]
@@ -184,8 +280,8 @@ def main(args):
 
     # Auxiliar values to compute the splits
     N = len(main_df_subjects)
-    tr_end = splits_sizes[0]  # 0.6 (by default)
-    val_end = tr_end + splits_sizes[1]  # 0.6 + 0.2 = 0.8 (by default)
+    tr_end = args.splits[0]  # 0.6 (by default)
+    val_end = tr_end + args.splits[1]  # 0.6 + 0.2 = 0.8 (by default)
     # The test split goes from 0.8 to 1.0 (by default)
 
     # Create the split train (60%), validation (20%), test (20%)
@@ -212,7 +308,7 @@ def main(args):
     print(f"Test split samples: {n_te_samples}")
 
     # Store the new main DataFrame to a TSV
-    main_df_outfile = os.path.join(subjects_path, f"{args.yaml_name}.tsv")
+    main_df_outfile = os.path.join(args.sub_path, f"{args.yaml_name}.tsv")
     main_df.to_csv(main_df_outfile, sep='\t', index=False)
     print(f'\nStored splits data in "{main_df_outfile}"')
 
@@ -221,9 +317,9 @@ def main(args):
     created with all the informaton about the samples.
     """
 
-    yaml_outfile = os.path.join(subjects_path, f"{args.yaml_name}.yaml")
+    yaml_outfile = os.path.join(args.sub_path, f"{args.yaml_name}.yaml")
     stats_dict = create_ecvl_yaml(
-        main_df, yaml_outfile, target_labels, multiclass)
+        main_df, yaml_outfile, args.target_labels, args.multiclass)
     print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
 
     print("\nYAML labels count:")
@@ -235,12 +331,12 @@ if __name__ == "__main__":
     # Script arguments handler
     arg_parser = argparse.ArgumentParser(
         description=("Prepares the YAML file to create the ECVL Dataset. "
-                     "The YAML file will be placed in the data-path provided"),
+                     "The YAML file will be placed in the sub-path provided"),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     arg_parser.add_argument(
-        "--data-path",
-        help="Path to the folder with the subjects data",
+        "--sub-path",
+        help="Path to the directory with the subjects data folders",
         default="../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/")
 
     arg_parser.add_argument(
@@ -250,13 +346,53 @@ if __name__ == "__main__":
         default=None)
 
     arg_parser.add_argument(
+        "--no-relabel",
+        help=("By default some samples are relabeled using the COVID tests "
+              "that are positive and with a close date to the scan day. The "
+              "days margin can be configured with the flags: "
+              "--prev-days and --post-days"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--prev-days",
+        help=("Number of previous days before the scan day to take the COVID "
+              "test result as relevant. '0' means the same day."),
+        default=0,
+        type=int)
+
+    arg_parser.add_argument(
+        "--post-days",
+        help=("Number of days after the scan day to take the COVID "
+              "test result as relevant. '0' means the same day."),
+        default=0,
+        type=int)
+
+    arg_parser.add_argument(
+        "--mandatory-labels",
+        help=("List of labels that must be present in a sample to be able to "
+              "relabel it using the COVID tests results"),
+        metavar="label_name",
+        nargs='*',
+        default=["COVID 19 uncertain", "pneumonia", "infiltrates"],
+        type=str)
+
+    arg_parser.add_argument(
+        "--labels-to-avoid",
+        help=("List of labels that must NOT be present in a sample to be able "
+              "to relabel it using the COVID tests results"),
+        metavar="label_name",
+        nargs='*',
+        default=["exclude", "normal"],
+        type=str)
+
+    arg_parser.add_argument(
         "--seed",
         help="Seed value to shuffle the dataset",
         default=1234,
         type=int)
 
     arg_parser.add_argument(
-        "--labels",
+        "--target-labels",
         help=("Target labels to select the samples for training. "
               "The order is important, the first matching label will be taken "
               "as the label for the sample."),
@@ -286,8 +422,16 @@ if __name__ == "__main__":
         type=int)
 
     arg_parser.add_argument(
+        "--new-preproc",
+        help=("If not set the script tries to use a previously preprocessed "
+              "image (if it exists), else the preprocessing is always done"),
+        action="store_true")
+
+    arg_parser.add_argument(
         "--yaml-name",
-        help="Name of the YAML file to create (without the file extension)",
+        help=("Name of the YAML file to create (without the file extension). "
+              "This name is also used to create the folder for the "
+              "preprocessed data ('{YAML_NAME}_preproc_data')"),
         default="ecvl_bimcv_covid19",
         type=str)
 
