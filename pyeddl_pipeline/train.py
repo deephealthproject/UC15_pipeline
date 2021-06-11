@@ -106,6 +106,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--batch-size", "-bs",
         help="Size of the training batches of data",
+        type=int,
         default=16)
 
     arg_parser.add_argument(
