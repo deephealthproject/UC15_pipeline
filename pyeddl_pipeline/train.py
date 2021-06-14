@@ -77,11 +77,33 @@ def main(args):
     # Create the plots of the training curves for loss and accuracy
     plot_training_results(history, exp_name, args.plots_path)
 
+    # Load the best model f r testing
+    print(f"\nGoing to load the model \"{history['best_model']}\" for testing")
+    best_model = eddl.import_net_from_onnx_file(history["best_model"])
+
+    # Create the optimizer
+    opt = get_optimizer(args.optimizer, args.learning_rate)
+
+    # Get the computing device
+    if args.cpu:
+        comp_serv = eddl.CS_CPU(-1, args.mem_level)
+    else:
+        comp_serv = eddl.CS_GPU(args.gpus, 1, args.mem_level)
+
+    eddl.build(best_model,
+               opt,
+               ["softmax_cross_entropy"],
+               ['accuracy'],
+               comp_serv,
+               False)  # Avoid weights initialization
+
     # Inference on test split
-    test_results = test(model, dataset, args)
+    test_results = test(best_model, dataset, args)
     test_loss = test_results['loss']
     test_acc = test_results['acc']
-    print(f"Test results: loss={test_loss:.4f} - acc={test_acc:.4f}")
+    test_report = test_results['report']
+    print(f"\nTest results: loss={test_loss:.4f} - acc={test_acc:.4f}")
+    print(f"Test report:\n{test_report}")
 
 
 if __name__ == "__main__":

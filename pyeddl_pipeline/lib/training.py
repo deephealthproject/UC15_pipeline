@@ -6,6 +6,8 @@ import argparse
 import random
 import time
 
+import numpy as np
+from sklearn.metrics import classification_report
 from tqdm import tqdm
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
@@ -180,8 +182,13 @@ def train(model: eddl.Model,
               batch_size, epochs...
 
     Returns:
-        A list with the history of the losses and metrics during all the
-        training epochs.
+        A dictionary with a summary of the training phase.
+        keys:
+            - loss: Loss of each epoch with the training split
+            - acc: Accuracy of each epoch with the training split
+            - val_loss: Loss of each epoch with the validation split
+            - val_acc: Accuracy of each epoch with the validation split
+            - best_model: Path to the ONNX file with the best model
     """
     n_train_samples = len(dataset.GetSplit(ecvl.SplitType.training))
     n_train_batches = n_train_samples // args.batch_size
@@ -289,6 +296,7 @@ def train(model: eddl.Model,
             model_path = os.path.join(args.models_ckpts, model_name)
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
+            history["best_model"] = model_path
 
     return history
 
@@ -309,6 +317,11 @@ def test(model: eddl.Model,
 
     Returns:
         A dictionary with a summary of the testing phase.
+        keys:
+            - loss: Test loss
+            - acc: Test accuracy
+            - report: Full report with more metrics by class
+                      (Check: sklearn.metrics.classification_report)
     """
     n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
     n_test_batches = n_test_samples // args.batch_size
@@ -331,6 +344,9 @@ def test(model: eddl.Model,
     # To track the average load and testing time for each batch
     load_time = 0
     test_time = 0
+    # To store the predictions and labels to compute statistics
+    preds = None
+    targets = None
     for batch in pbar:
         # Load batch of data
         load_start = time.perf_counter()
@@ -342,6 +358,16 @@ def test(model: eddl.Model,
         eddl.eval_batch(model, [x], [y])
         test_end = time.perf_counter()
         test_time += test_end - test_start
+        # Store the predictions to compute statistics later
+        batch_logits = eddl.getOutput(eddl.getOut(model)[0]).getdata()
+        batch_preds = np.argmax(batch_logits, axis=1)
+        batch_targets = np.argmax(y.getdata(), axis=1)
+        if preds is None:
+            preds = batch_preds
+            targets = batch_targets
+        else:
+            preds = np.concatenate((preds, batch_preds))
+            targets = np.concatenate((targets, batch_targets))
         # Get current metrics
         losses = eddl.get_losses(model)
         metrics = eddl.get_metrics(model)
@@ -351,8 +377,14 @@ def test(model: eddl.Model,
         pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
                           "avg_test_time": f"{test_time / batch:.3f}s"})
 
+    # Compute a report with statistics for each target class
+    report = classification_report(targets,
+                                   preds,
+                                   target_names=dataset.classes_)
+
     # Save test results
     history["loss"] = losses[0]
     history["acc"] = metrics[0]
+    history["report"] = report
 
     return history

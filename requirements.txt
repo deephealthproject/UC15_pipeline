@@ -6,3 +6,4 @@ matplotlib
 pyyaml
 scikit-image
 ipywidgets
+scikit-learn
