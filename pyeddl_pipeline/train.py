@@ -73,6 +73,7 @@ def main(args):
 
     # Train the model
     history = train(model, dataset, exp_name, args)
+    del model  # Free the memory before the testing phase
 
     # Create the plots of the training curves for loss and accuracy
     plot_training_results(history, exp_name, args.plots_path)

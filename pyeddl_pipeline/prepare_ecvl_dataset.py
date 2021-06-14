@@ -2,7 +2,8 @@
 This script prepares the YAML file needed by the ECVL library to create the
 Dataset object to load the batches of data for training. This YAML file
 contains the paths to the images and their corresponding metadata. The YAML
-also provides the partitions for training, validation and test.
+also provides the partitions for training, validation and test. Before
+creating the YAML file the script also performs a first image preprocessing.
 """
 import os
 import argparse
