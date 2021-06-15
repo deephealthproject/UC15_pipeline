@@ -171,7 +171,26 @@ def main(args):
 
     # Get the rows of the DataFrame that have at least one of the target labels
     samples_filter = labels_df.apply(filter_by_labels, axis=1)  # Rows mask
-    selected_labels = labels_df[samples_filter]
+    selected_labels = labels_df[samples_filter].copy()
+
+    # Prepare a function to extrat the label to classify each sample
+    #   Note: In the labels_df dataframe each sample has a list of labels
+    if args.multiclass:
+        # Auxiliary set to compute the intersection with the samples labels
+        target_labels_set = set(args.target_labels)
+
+        def select_label(row_labels: pd.Series):
+            # Get the labels from the sample that are in target_labels list
+            row_labels_set = set(row_labels)
+            return list(target_labels_set.intersection(row_labels_set))
+    else:
+        def select_label(row_labels: pd.Series):
+            for label in args.target_labels:
+                if label in row_labels:
+                    return [label]  # Return the first match
+
+    # Convert the lists of labels to a single label list
+    selected_labels["Labels"] = selected_labels["Labels"].apply(select_label)
 
     # 2 - Filter by views (AP and PA)
     #   Note: We know the view by looking at the image file name
@@ -187,6 +206,7 @@ def main(args):
     selected_samples = part_df[samples_filter]
 
     # 3 - Get only the images that are manually validated
+
     if args.clean_data:
         # Load the dataframe with the annotations
         clean_df = pd.read_csv(args.clean_data, sep='\t')
