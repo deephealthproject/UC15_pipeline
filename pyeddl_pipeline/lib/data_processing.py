@@ -81,30 +81,21 @@ def create_ecvl_yaml(df: pd.DataFrame,
     splits_indexes = {split_name: list()
                       for split_name in df["split"].unique()}
 
-    # Auxiliary set object to compute intersections of labels sets
-    target_labels_set = set(target_labels)
-
     counts_dict = {}  # Counts by label to return at the end
 
     for sample_idx, (_, row) in enumerate(df.iterrows()):
-        # Get the labels for the sample
-        if multiclass:
-            labels = list(target_labels_set.intersection(set(row["labels"])))
-            label_name = "_and_".join(sorted(labels))
-            counts_dict[label_name] = counts_dict.get(label_name, 0) + 1
-        else:
-            labels = []
-            for label in target_labels:
-                if label in row["labels"]:
-                    labels.append(label)
-                    counts_dict[label] = counts_dict.get(label, 0) + 1
-                    break  # We take the first matching label
+        assert len(row["labels"]) > 0  # Sanity check
 
-        assert len(labels) > 0  # Sanity check
+        # Update the classes counter
+        if multiclass:
+            label_name = "_and_".join(sorted(row["labels"]))
+        else:
+            label_name = row["labels"][0]
+        counts_dict[label_name] = counts_dict.get(label_name, 0) + 1
 
         # Store the sample data
         samples.append({"location": row["filepath"],
-                        "label": labels,
+                        "label": row["labels"],
                         "values": {"age": row["age"],
                                    "gender": row["gender"]}})
 
