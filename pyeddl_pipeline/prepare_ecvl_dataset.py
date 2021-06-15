@@ -243,7 +243,7 @@ def main(args):
     images_to_preprocess = []
 
     # Iterate over each sample to collect the data to create the new "main_df"
-    print("Collecting samples data:")
+    print("\nCollecting samples data:")
     n_selected = len(selected_samples.index)
     for idx, row in tqdm(selected_samples.iterrows(), total=n_selected):
         sub_id = row["subject"]
@@ -295,24 +295,147 @@ def main(args):
         Note: The splits are made at subject level.
     """
 
-    # Get a list with the subjects IDs shuffled (without repeated IDs)
-    main_df_subjects = main_df["subject"].unique()
-    np.random.shuffle(main_df_subjects)
+    if not args.avoid_balancing:
+        print("\nGoing to create the balanced validation and test partitions")
+        """
+        Prepare the data structure to balance the data splits
+        """
+        data_by_sub = main_df.groupby("subject")
+        label2idx = {label: i for i, label in enumerate(args.target_labels)}
+        # To collect the data for balancing the splits. A list per target label
+        subs_labels = [[] for _ in range(len(args.target_labels))]
 
-    # Auxiliar values to compute the splits
-    N = len(main_df_subjects)
-    tr_end = args.splits[0]  # 0.6 (by default)
-    val_end = tr_end + args.splits[1]  # 0.6 + 0.2 = 0.8 (by default)
-    # The test split goes from 0.8 to 1.0 (by default)
+        for sub_id, sub_sessions in data_by_sub:
+            # Count the number of sessions for each label
+            sub_labels_counter = np.array([0] * len(args.target_labels))
+            for idx, sess in sub_sessions.iterrows():
+                for label in sess["labels"]:
+                    sub_labels_counter[label2idx[label]] += 1
 
-    # Create the split train (60%), validation (20%), test (20%)
-    train, val, test = np.split(main_df_subjects,
-                                [int(tr_end * N), int(val_end * N)])
+            # This is the label that will be taken into account when filling
+            # the patitions in a balanced way
+            main_label = np.argmax(sub_labels_counter)
+            # Save the subject data
+            subs_labels[main_label].append((sub_id, sub_labels_counter))
+
+        # Sort each list by number of sessions for each subject
+        for subs_l in subs_labels:
+            subs_l.sort(key=lambda x: sum(x[1]))
+
+        """
+        Define the splits by creating balanced validation and tests splits, and
+        putting the rest of the data into the training split
+        """
+        # Define the size of the partitions
+        n_total_samples = len(main_df.index)
+        n_val = int(n_total_samples * args.splits[1])
+        n_test = int(n_total_samples * args.splits[2])
+
+        # Fill the validation split
+        val_subjects = []
+        n_val_samples = 0
+        val_labels = np.array([0] * len(args.target_labels))
+        min_label = 0
+        while n_val_samples < n_val:
+            # Take a subject to add samples to the current minimum label
+            try:
+                sub_id, labels = subs_labels[min_label].pop()
+            except IndexError as err:
+                label_name = args.target_labels[min_label]
+                my_err = Exception(("The are not enought samples of the "
+                                    f"class {label_name} to create a "
+                                    " balanced validation split"))
+                raise my_err from err
+            # Add the subject to the validation split
+            val_subjects.append(sub_id)
+            # Update the number of samples for each label
+            val_labels += labels
+            # Update the new total number of samples
+            n_val_samples = sum(val_labels)
+            # Take the new minimum label
+            min_label = np.argmin(val_labels)
+
+        # Fill the test split
+        test_subjects = []
+        n_test_samples = 0
+        test_labels = np.array([0] * len(args.target_labels))
+        min_label = 0
+        while n_test_samples < n_test:
+            # Take a subject to add samples to the current minimum label
+            try:
+                sub_id, labels = subs_labels[min_label].pop()
+            except IndexError as err:
+                label_name = args.target_labels[min_label]
+                my_err = Exception(("The are not enought samples of the "
+                                    f"class {label_name} to create a "
+                                    " balanced test split"))
+                raise my_err from err
+
+            # Add the subject to the test split
+            test_subjects.append(sub_id)
+            # Update the number of samples for each label
+            test_labels += labels
+            # Update the new total number of samples
+            n_test_samples = sum(test_labels)
+            # Take the new minimum label
+            min_label = np.argmin(test_labels)
+
+        # Put the rest of the samples into the train split
+        train_subjects = []
+        train_labels = np.array([0] * len(args.target_labels))
+        for subs_l in subs_labels:
+            for sub_id, labels in subs_l:
+                # Add the subject to the training split
+                train_subjects.append(sub_id)
+                # Update the number of samples for each label
+                train_labels += labels
+
+        n_train_samples = sum(train_labels)
+
+        print("\nTrain split:")
+        print(f"  + number of samples: {n_train_samples}")
+        print("  + labels distribution:")
+        for i, count in enumerate(train_labels):
+            print(f"    - {args.target_labels[i]}: {count}")
+        print(f"  + number of subjects: {len(train_subjects)}")
+
+        print("\nValidation split:")
+        print(f"  + number of samples: {n_val_samples}")
+        print("  + labels distribution:")
+        for i, count in enumerate(val_labels):
+            print(f"    - {args.target_labels[i]}: {count}")
+        print(f"  + number of subjects: {len(val_subjects)}")
+
+        print("\nTest split:")
+        print(f"  + number of samples: {n_test_samples}")
+        print("  + labels distribution:")
+        for i, count in enumerate(test_labels):
+            print(f"    - {args.target_labels[i]}: {count}")
+        print(f"  + number of subjects: {len(test_subjects)}")
+
+    else:  # args.avoid_balancing is True
+        print("\nGoing to create the partitions randomly (without balancing)")
+        # Get a list with the subjects IDs shuffled (without repeated IDs)
+        main_df_subjects = main_df["subject"].unique()
+        np.random.shuffle(main_df_subjects)
+
+        # Auxiliar values to compute the splits
+        N = len(main_df_subjects)
+        tr_end = args.splits[0]  # 0.7 (by default)
+        val_end = tr_end + args.splits[1]  # 0.7 + 0.15 = 0.85 (by default)
+        # The test split goes from 0.85 to 1.0 (by default)
+
+        # Create the split train (70%), validation (15%), test (15%)
+        sub_splits = np.split(main_df_subjects,
+                              [int(tr_end * N), int(val_end * N)])
+        train_subjects, val_subjects, test_subjects = sub_splits
 
     # Create a new column in the main DataFrame to set the split of each sample
     main_df["split"] = ""
 
-    splits = [("training", train), ("validation", val), ("test", test)]
+    splits = [("training", train_subjects),
+              ("validation", val_subjects),
+              ("test", test_subjects)]
 
     # Set the split values
     for name, split in splits:
@@ -433,7 +556,7 @@ if __name__ == "__main__":
         help="Size of the train, validation and test splits",
         metavar=("train_size", "val_size", "test_size"),
         nargs=3,
-        default=[0.6, 0.2, 0.2],
+        default=[0.7, 0.15, 0.15],
         type=float)
 
     arg_parser.add_argument(
@@ -455,5 +578,11 @@ if __name__ == "__main__":
               "preprocessed data ('{YAML_NAME}_preproc_data')"),
         default="ecvl_bimcv_covid19",
         type=str)
+
+    arg_parser.add_argument(
+        "--avoid-balancing",
+        help=("To disable the data balancing for all the splits. By default "
+              "the validation and test splits are balanced."),
+        action="store_true")
 
     main(arg_parser.parse_args())
