@@ -9,17 +9,20 @@ import os
 import argparse
 import ast
 import multiprocessing as mp
+import random
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from lib.data_processing import get_labels_from_str, create_ecvl_yaml
-from lib.image_processing import histogram_equalization
+from lib.image_processing import histogram_equalization, create_copy_with_DA
 
 
 def main(args):
-    np.random.seed(args.seed)  # Set the random seed for Numpy
+    # Set the seeds to be able to replicate the results
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     assert sum(args.splits) == 1, "The splits values sum must be 1.0!"
 
@@ -443,6 +446,132 @@ def main(args):
             # Set the split value for all the samples of the current subject
             main_df.loc[main_df["subject"] == sub_id, "split"] = name
 
+    """
+    Balance the training split.
+
+    The strategies available are:
+        - oversampling: The samples of the minority classes are replicated
+                        randomly using data augmentaion until the number of
+                        samples in each class is equal to the majority class
+
+        - undersampling: The samples of the majority class (or classes) are
+                         randomly deleted until reaching the same number of
+                         samples than the minority class
+    """
+
+    if args.train_balancing_type is not None and not args.avoid_balancing:
+        if args.train_balancing_type == "oversampling":
+            print("\nGoing to user oversampling to balance the train split:")
+            # We store the pairs of images paths (orig, dest) of the images
+            # that we are going to copy applying data augmentaion.
+            images_to_aug = []
+
+            # Select the samples of the training split
+            train_samples = main_df[main_df["split"] == "training"]
+
+            # Get the index and number of samples of the majority label
+            max_label = np.argmax(train_labels)
+            n_max_label = train_labels[max_label]
+            print((f" - The majority class is {args.target_labels[max_label]} "
+                   f"with {n_max_label} samples"))
+            for label_idx, label in enumerate(args.target_labels):
+                if label_idx == max_label:
+                    continue  # We dont't have to replicate any sample
+
+                # Get the samples of the current label in the training split
+                samples_filter = train_samples.apply(
+                    lambda row: label in row["labels"], axis=1)
+                label_samples = train_samples[samples_filter]
+
+                # Select random samples to copy
+                n_samples = len(label_samples.index)
+                n_to_copy = n_max_label - n_samples
+                assert n_to_copy >= 0  # Sanity check
+                print((f" - Class {label} has {n_samples}, "
+                       f"going to create {n_to_copy} to reach {n_max_label}"))
+
+                # To see if we have to create extra copies for some samples
+                extra_copies = False
+                # Compute the fixed number of copies that we have to make
+                # for each sample of the minority label
+                if n_to_copy < n_samples:
+                    n_copies = 1
+                    rand_select = random.sample(range(n_samples), n_to_copy)
+                    samples_to_copy = label_samples.iloc[rand_select]
+                elif n_to_copy == n_samples:
+                    n_copies = 1
+                    samples_to_copy = label_samples
+                else:
+                    n_copies = (n_to_copy // n_samples)
+                    samples_to_copy = label_samples
+                    extra_copies = True
+
+                # Add the fixed number of copies for each sample
+                for idx, row in samples_to_copy.iterrows():
+                    for copy_idx in range(n_copies):
+                        # Create the filepath of the new copy
+                        #  Note: This path is relative to the YAML file
+                        orig_path = row["filepath"]
+                        new_path = orig_path[:-4] + f"_DA-{copy_idx}" + ".png"
+                        # Create the paths for creating the copies
+                        orig_img_path = os.path.join(args.sub_path, orig_path)
+                        new_img_path = os.path.join(args.sub_path, new_path)
+                        # Add the sample to the data augmentaion queue
+                        if not os.path.isfile(new_img_path) or args.new_preproc:
+                            images_to_aug.append((orig_img_path, new_img_path))
+
+                        # Add the copy to the main dataframe
+                        new_row = {'subject': row["subject"],
+                                   'session': row["session"],
+                                   'filepath': new_path,
+                                   'labels': row["labels"],
+                                   'gender': row["gender"],
+                                   'age': row["age"],
+                                   'split': row["split"]}
+                        main_df = main_df.append(new_row, ignore_index=True)
+
+                if extra_copies:
+                    # Compute the number of missing copies
+                    n_extra = n_to_copy - (n_copies * n_samples)
+                    assert 0 < n_extra < n_samples  # Sanity check
+                    # Select randomly the samples to make the copies
+                    rand_select = random.sample(range(n_samples), n_extra)
+                    samples_to_copy = label_samples.iloc[rand_select]
+                    copy_idx = n_copies
+                    for idx, row in samples_to_copy.iterrows():
+                        # Create the filepath of the new copy
+                        orig_path = row["filepath"]
+                        new_path = orig_path[:-4] + f"_DA-{copy_idx}" + ".png"
+                        # Create the paths for creating the copies
+                        orig_img_path = os.path.join(args.sub_path, orig_path)
+                        new_img_path = os.path.join(args.sub_path, new_path)
+                        # Add the sample to the data augmentaion queue
+                        if not os.path.isfile(new_img_path) or args.new_preproc:
+                            images_to_aug.append((orig_img_path, new_img_path))
+
+                        # Add the copy to the main dataframe
+                        new_row = {'subject': row["subject"],
+                                   'session': row["session"],
+                                   'filepath': new_path,
+                                   'labels': row["labels"],
+                                   'gender': row["gender"],
+                                   'age': row["age"],
+                                   'split': row["split"]}
+                        main_df = main_df.append(new_row, ignore_index=True)
+
+            # Apply the augmentaions to the images (in parallel)
+            print("\nCreating augmented copies of the images...")
+            with mp.Pool(processes=args.n_proc) as pool:
+                pool.starmap(create_copy_with_DA, images_to_aug, 10)
+            print("Images created!")
+
+        elif args.train_balancing_type == "undersampling":
+            raise Exception("Undersampling is not implemented!")
+        else:
+            raise Exception(("The balancing strategy provided for the train "
+                             "split is not valid"))
+
+    # Show a summary of the number of samples by split
     print(f"\nTotal samples: {len(main_df.index)}")
     n_tr_samples = len(main_df[main_df['split'] == 'training'])
     print(f"Train split samples: {n_tr_samples}")
@@ -577,6 +706,13 @@ if __name__ == "__main__":
               "This name is also used to create the folder for the "
               "preprocessed data ('{YAML_NAME}_preproc_data')"),
         default="ecvl_bimcv_covid19",
+        type=str)
+
+    arg_parser.add_argument(
+        "--train-balancing-type",
+        help="Declares strategy to balance the samples in the training split",
+        default=None,
+        choices=["undersampling", "oversampling"],
         type=str)
 
     arg_parser.add_argument(

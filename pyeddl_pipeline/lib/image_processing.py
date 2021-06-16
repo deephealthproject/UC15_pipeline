@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 import nibabel as nib
 from skimage import exposure
+import albumentations as A
 
 
 def png2numpy(png_path: str) -> np.ndarray:
@@ -102,5 +103,35 @@ def histogram_equalization(img_path: str,
 
     # Store the processed image
     pil_img = Image.fromarray(img, mode='L')
-    img = np.array(pil_img)
+    pil_img.save(img_outpath, format="PNG")
+
+
+def create_copy_with_DA(img_path: str,
+                        img_outpath: str):
+    """
+    Creates a copy of an images with data augmentation applied.
+
+    Args:
+        img_path: Path to the image to copy (it must be a .png).
+
+        img_outpath: Path of the output .png file to create.
+    """
+    img = load_numpy_data(img_path)
+
+    # DA operations
+    transform = A.Compose([
+        A.RandomBrightnessContrast(brightness_limit=0.2,
+                                   contrast_limit=0.2,
+                                   always_apply=True),
+        A.Affine(scale=[0.9, 1.1],
+                 translate_percent=0.05,
+                 rotate=[-10, 10],
+                 always_apply=True)
+    ])
+
+    # Apply the transformations
+    aug_img = np.uint8(transform(image=img)["image"])
+
+    # Store the transformed copy
+    pil_img = Image.fromarray(aug_img, mode='L')
     pil_img.save(img_outpath, format="PNG")

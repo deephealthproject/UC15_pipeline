@@ -7,3 +7,4 @@ pyyaml
 scikit-image
 ipywidgets
 scikit-learn
+albumentations
