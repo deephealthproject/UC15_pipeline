@@ -154,13 +154,13 @@ def main(args):
     Filter samples of interest to create the final Dataset.
 
         1 - The selected samples to create the ECVL Dataset must have at least
-            one of the labels of interest (defined in args.target_labels).
+            one of the labels of interest (defined in args.target_labels)
 
         2 - The selected samples must be also anterior-posterior (AP) or
-            posterior-anterior (PA) views.
+            posterior-anterior (PA) views
 
         3 - If the clean-data argument is provided. We only take the images
-            that are labeled as "OK".
+            that are labeled as "OK" in the TSV provided by the clean-data flag
     """
 
     # 1 - Filter by labels
@@ -173,7 +173,7 @@ def main(args):
     samples_filter = labels_df.apply(filter_by_labels, axis=1)  # Rows mask
     selected_labels = labels_df[samples_filter].copy()
 
-    # Prepare a function to extrat the label to classify each sample
+    # Prepare a function to extract the label to classify each sample
     #   Note: In the labels_df dataframe each sample has a list of labels
     if args.multiclass:
         # Auxiliary set to compute the intersection with the samples labels
@@ -189,7 +189,7 @@ def main(args):
                 if label in row_labels:
                     return [label]  # Return the first match
 
-    # Convert the lists of labels to a single label list
+    # Convert the lists of labels to a list with only the target label
     selected_labels["Labels"] = selected_labels["Labels"].apply(select_label)
 
     # 2 - Filter by views (AP and PA)
