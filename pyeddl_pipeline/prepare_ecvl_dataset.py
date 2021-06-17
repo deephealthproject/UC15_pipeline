@@ -185,12 +185,16 @@ def main(args):
         def select_label(row_labels: pd.Series):
             # Get the labels from the sample that are in target_labels list
             row_labels_set = set(row_labels)
-            return list(target_labels_set.intersection(row_labels_set))
+            selected_lab = list(target_labels_set.intersection(row_labels_set))
+            if len(selected_lab) == 0:
+                raise Exception("Unexpected error. No target label found!")
+            return selected_lab
     else:
         def select_label(row_labels: pd.Series):
             for label in args.target_labels:
                 if label in row_labels:
                     return [label]  # Return the first match
+            raise Exception("Unexpected error. No target label found!")
 
     # Convert the lists of labels to a list with only the target label
     selected_labels["Labels"] = selected_labels["Labels"].apply(select_label)
