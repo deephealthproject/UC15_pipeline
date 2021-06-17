@@ -4,8 +4,6 @@ Module to create the models architectures.
 from typing import Callable
 
 import pyeddl.eddl as eddl
-from pyeddl.eddl import Conv, BatchNormalization, ReLu, MaxPool2D
-from pyeddl.eddl import Flatten, Dense, Softmax
 
 
 ##########
@@ -283,21 +281,46 @@ def model_1(in_shape: tuple, num_classes: int) -> eddl.Model:
     """Creates an EDDL model with the topology 'model_1'"""
     in_ = eddl.Input(in_shape)
 
-    l = ReLu(BatchNormalization(Conv(in_, 32, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = ReLu(BatchNormalization(Conv(l, 64, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = ReLu(BatchNormalization(Conv(l, 64, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = ReLu(BatchNormalization(Conv(l, 128, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = ReLu(BatchNormalization(Conv(l, 128, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = ReLu(BatchNormalization(Conv(l, 256, [3, 3]), True))
-    l = MaxPool2D(l, [2, 2])
-    l = Flatten(l)
-    l = ReLu(Dense(l, 512))
-    out_ = Softmax(Dense(l, num_classes))
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(in_, 32, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 64, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 64, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 128, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 128, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 256, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.Flatten(l)
+    l = eddl.ReLu(eddl.Dense(l, 512))
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes))
+
+    return eddl.Model([in_], [out_])
+
+
+def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
+    """Creates an EDDL model with the topology 'model_2'"""
+    in_ = eddl.Input(in_shape)
+
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(in_, 32, [5, 5]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 64, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 64, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 128, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 128, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 256, [3, 3]), True))
+    l = eddl.MaxPool2D(l, [2, 2])
+    l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(l, 256, [3, 3]), True))
+    l = eddl.GlobalAveragePool2D(l)
+    l = eddl.Flatten(l)
+    l = eddl.ReLu(eddl.Dense(l, 128))
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes))
 
     return eddl.Model([in_], [out_])
 
@@ -319,6 +342,8 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
     # Custom models
     if model_name == "model_1":
         return model_1(in_shape, num_classes)
+    if model_name == "model_2":
+        return model_2(in_shape, num_classes)
 
     # ResNet models
     if model_name == "ResNet18":
