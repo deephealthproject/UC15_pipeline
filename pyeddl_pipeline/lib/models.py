@@ -325,6 +325,52 @@ def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
     return eddl.Model([in_], [out_])
 
 
+def model_3(in_shape: tuple, num_classes: int) -> eddl.Model:
+    """Creates an EDDL model with the topology 'model_3'"""
+    in_ = eddl.Input(in_shape)
+
+    block1 = conv_bn_relu(in_, filters=32, kernel_size=[5, 5])
+    block1 = conv_bn_relu(block1, filters=32, kernel_size=[3, 3])
+    block1 = eddl.Add([block1, eddl.PointwiseConv2D(in_, 32)])
+    block1 = eddl.MaxPool2D(block1, [2, 2])
+
+    block2 = conv_bn_relu(block1, filters=64, kernel_size=[3, 3])
+    block2 = conv_bn_relu(block2, filters=64, kernel_size=[3, 3])
+    block2 = eddl.Add([block2, eddl.PointwiseConv2D(block1, 64)])
+    block2 = eddl.MaxPool2D(block2, [2, 2])
+
+    block3 = conv_bn_relu(block2, filters=64, kernel_size=[3, 3])
+    block3 = conv_bn_relu(block3, filters=64, kernel_size=[3, 3])
+    block3 = eddl.Add([block3, block2])
+    block3 = eddl.MaxPool2D(block3, [2, 2])
+
+    block4 = conv_bn_relu(block3, filters=128, kernel_size=[3, 3])
+    block4 = conv_bn_relu(block4, filters=128, kernel_size=[3, 3])
+    block4 = eddl.Add([block4, eddl.PointwiseConv2D(block3, 128)])
+    block4 = eddl.MaxPool2D(block4, [2, 2])
+
+    block5 = conv_bn_relu(block4, filters=128, kernel_size=[3, 3])
+    block5 = conv_bn_relu(block5, filters=128, kernel_size=[3, 3])
+    block5 = eddl.Add([block5, block4])
+    block5 = eddl.MaxPool2D(block5, [2, 2])
+
+    block6 = conv_bn_relu(block5, filters=256, kernel_size=[3, 3])
+    block6 = conv_bn_relu(block6, filters=256, kernel_size=[3, 3])
+    block6 = eddl.Add([block6, eddl.PointwiseConv2D(block5, 256)])
+    block6 = eddl.MaxPool2D(block6, [2, 2])
+
+    block7 = conv_bn_relu(block6, filters=256, kernel_size=[3, 3])
+    block7 = conv_bn_relu(block7, filters=256, kernel_size=[3, 3])
+    block7 = eddl.Add([block7, block6])
+    block7 = eddl.GlobalAveragePool2D(block7)
+    conv_out = eddl.Flatten(block7)
+
+    dense1 = eddl.ReLu(eddl.Dense(conv_out, 128))
+    out_ = eddl.Softmax(eddl.Dense(dense1, num_classes))
+
+    return eddl.Model([in_], [out_])
+
+
 def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
     """
     Auxiliary function to create the selected model topology.
@@ -344,6 +390,8 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
         return model_1(in_shape, num_classes)
     if model_name == "model_2":
         return model_2(in_shape, num_classes)
+    if model_name == "model_3":
+        return model_3(in_shape, num_classes)
 
     # ResNet models
     if model_name == "ResNet18":

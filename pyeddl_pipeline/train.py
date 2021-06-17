@@ -150,7 +150,7 @@ if __name__ == "__main__":
         help="Model architecture to train",
         default="model_1",
         type=str,
-        choices=["model_1", "model_2",
+        choices=["model_1", "model_2", "model_3",
                  "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152"])
 
     arg_parser.add_argument(
