@@ -2,6 +2,9 @@
 Module with auxiliary functions to deal with the images. From IO operations
 to processing functions.
 """
+import os
+import json
+
 import numpy as np
 from PIL import Image
 import nibabel as nib
@@ -74,7 +77,8 @@ def get_stats(img_file_path: str) -> list:
 
 def histogram_equalization(img_path: str,
                            img_outpath: str,
-                           hist_type: str = "adaptive"):
+                           hist_type: str = "adaptive",
+                           invert_img: bool = True):
     """
     Applies histogram equalization to the image given and stores the
     preprocessed version in the provided output path.
@@ -86,8 +90,25 @@ def histogram_equalization(img_path: str,
 
         hist_type: Type of histogram equalization.
                    It can be "normal" or "adaptive".
+
+        invert_img: If True, checks the image metadata to see if the image
+                    values should be inverted. The metadata should be in a
+                    json file with the same name than the image and it must
+                    be in the same folder.
     """
     img = load_numpy_data(img_path)
+
+    if invert_img:
+        # The images that are monochrome 1 must be inverted
+        json_path = img_path[:-4] + ".json"
+        if os.path.isfile(json_path):
+            with open(json_path, 'r') as json_file:
+                data = json.load(json_file)
+                if data["00280004"]["Value"][0] == "MONOCHROME1":
+                    print(f"Going to invert image '{img_path}'")
+                    img = img.max() - img  # Invert the image
+        else:
+            print(f"JSON with metadata not found for image '{img_path}'")
 
     # Apply equalization
     if hist_type == "adaptive":

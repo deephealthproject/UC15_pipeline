@@ -292,6 +292,11 @@ def main(args):
         main_df = main_df.append(new_row, ignore_index=True)
 
     # Apply the preprocessing to the images (in parallel)
+    #  - The preprocessing steps applied are:
+    #      1. Invert the image pixels if the original image is inverted. We do
+    #         this by looking at the image metadata.
+    #
+    #      2. Normalize the image using histogram equalization
     print("\nPreprocessing the images...")
     with mp.Pool(processes=args.n_proc) as pool:
         pool.starmap(histogram_equalization, images_to_preprocess, 10)
@@ -375,7 +380,7 @@ def main(args):
                 label_name = args.target_labels[min_label]
                 my_err = Exception(("The are not enought samples of the "
                                     f"class {label_name} to create a "
-                                    " balanced test split"))
+                                    "balanced test split"))
                 raise my_err from err
 
             # Add the subject to the test split
