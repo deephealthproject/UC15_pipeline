@@ -33,10 +33,12 @@ def main(args):
         # Load the model from an ONNX file
         model = eddl.import_net_from_onnx_file(args.model_ckpt)
         init_weights = False  # Avoid resetting the loaded weights
+        l2init = []  # All the layers have weights from the ONNX file
     else:
         # Create the model
-        model = get_model(args.model, in_shape, num_classes)
-        init_weights = True
+        model, init_weights, l2init = get_model(args.model,
+                                                in_shape,
+                                                num_classes)
 
     # Create the optimizer
     opt = get_optimizer(args.optimizer, args.learning_rate)
@@ -54,6 +56,11 @@ def main(args):
                ['accuracy'],
                comp_serv,
                init_weights)
+
+    if not init_weights:
+        # Initialize the new layers
+        for layer_name in l2init:
+            eddl.initializeLayer(model, layer_name)
 
     eddl.summary(model)  # Print the model layers
 

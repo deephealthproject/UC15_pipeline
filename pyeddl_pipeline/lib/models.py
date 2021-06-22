@@ -222,7 +222,15 @@ def build_resnet(in_shape: tuple,
                   at each level of the model.
 
     Returns:
-        A EDDL model with the defined ResNet architecture.
+        A list with:
+            - The EDDL model object with the ResNet architecture.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
     """
     in_ = eddl.Input(in_shape)
     # First conv block before the resiual blocks
@@ -250,7 +258,7 @@ def build_resnet(in_shape: tuple,
     l = eddl.Dense(l, num_classes)
     out_ = eddl.Softmax(l)
 
-    return eddl.Model([in_], [out_])
+    return eddl.Model([in_], [out_]), True, []
 
 
 def resnet_18(in_shape: tuple, num_classes: int) -> eddl.Model:
@@ -278,7 +286,25 @@ def resnet_152(in_shape: tuple, num_classes: int) -> eddl.Model:
 #################
 
 def model_1(in_shape: tuple, num_classes: int) -> eddl.Model:
-    """Creates an EDDL model with the topology 'model_1'"""
+    """
+    Creates an EDDL model with the topology 'model_1'
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
     in_ = eddl.Input(in_shape)
 
     l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(in_, 32, [3, 3]), True))
@@ -297,11 +323,29 @@ def model_1(in_shape: tuple, num_classes: int) -> eddl.Model:
     l = eddl.ReLu(eddl.Dense(l, 512))
     out_ = eddl.Softmax(eddl.Dense(l, num_classes))
 
-    return eddl.Model([in_], [out_])
+    return eddl.Model([in_], [out_]), True, []
 
 
 def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
-    """Creates an EDDL model with the topology 'model_2'"""
+    """
+    Creates an EDDL model with the topology 'model_2'
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
     in_ = eddl.Input(in_shape)
 
     l = eddl.ReLu(eddl.BatchNormalization(eddl.Conv(in_, 32, [5, 5]), True))
@@ -322,11 +366,29 @@ def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
     l = eddl.ReLu(eddl.Dense(l, 128))
     out_ = eddl.Softmax(eddl.Dense(l, num_classes))
 
-    return eddl.Model([in_], [out_])
+    return eddl.Model([in_], [out_]), True, []
 
 
 def model_3(in_shape: tuple, num_classes: int) -> eddl.Model:
-    """Creates an EDDL model with the topology 'model_3'"""
+    """
+    Creates an EDDL model with the topology 'model_3'
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
     in_ = eddl.Input(in_shape)
 
     block1 = conv_bn_relu(in_, filters=32, kernel_size=[5, 5])
@@ -368,16 +430,36 @@ def model_3(in_shape: tuple, num_classes: int) -> eddl.Model:
     dense1 = eddl.ReLu(eddl.Dense(conv_out, 128))
     out_ = eddl.Softmax(eddl.Dense(dense1, num_classes))
 
-    return eddl.Model([in_], [out_])
+    return eddl.Model([in_], [out_]), True, []
 
 
 def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
-    """Creates an EDDL model with the topology 'model_4'"""
+    """
+    Creates an EDDL model with the topology 'model_4'
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
     in_ = eddl.Input(in_shape)
 
     block0 = eddl.Pad(in_, [2, 3, 3, 2])
-    block0 = conv_bn_relu(block0, filters=32, kernel_size=[7, 7], strides=(2, 2))
-    block0 = conv_bn_relu(block0, filters=64, kernel_size=[5, 5], strides=(2, 2))
+    block0 = conv_bn_relu(
+        block0, filters=32, kernel_size=[7, 7], strides=(2, 2))
+    block0 = conv_bn_relu(
+        block0, filters=64, kernel_size=[5, 5], strides=(2, 2))
 
     block1 = conv_bn_relu(block0, filters=64, kernel_size=[3, 3])
     block1 = conv_bn_relu(block1, filters=64, kernel_size=[3, 3])
@@ -412,10 +494,9 @@ def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
     block7 = conv_bn_relu(block6, filters=256, kernel_size=[3, 3])
     block7 = conv_bn_relu(block7, filters=256, kernel_size=[3, 3])
     block7 = eddl.Add([block7, eddl.PointwiseConv2D(block6, 256)])
-    #block7 = eddl.MaxPool2D(block7, [2, 2])
-    #block7 = eddl.GlobalAveragePool2D(block7)
 
-    block8 = conv_bn_relu(block7, filters=512, kernel_size=[3, 3], padding="valid")
+    block8 = conv_bn_relu(
+        block7, filters=512, kernel_size=[3, 3], padding="valid")
     block8 = conv_bn_relu(block8, filters=512, kernel_size=[1, 1])
     conv_out = eddl.Flatten(block8)
 
@@ -423,7 +504,7 @@ def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
     dense1 = eddl.ReLu(eddl.Dense(drop, 1024))
     out_ = eddl.Softmax(eddl.Dense(dense1, num_classes))
 
-    return eddl.Model([in_], [out_])
+    return eddl.Model([in_], [out_]), True, []
 
 
 def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
@@ -438,7 +519,15 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
         num_classes: Number of units in the last layer for classification.
 
     Returns:
-        An EDDL model (not built).
+        A list with:
+            - The EDDL model object (not built).
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
     """
     # Custom models
     if model_name == "model_1":
