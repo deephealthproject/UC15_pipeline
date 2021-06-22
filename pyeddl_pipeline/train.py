@@ -18,10 +18,11 @@ def main(args):
     splits_augs = get_augmentations(args.augmentations, args.target_size)
 
     # Create the dataset object to generate the batches of data
+    color_type = ecvl.ColorType.RGB if args.rgb else ecvl.ColorType.GRAY
     dataset = ecvl.DLDataset(args.yaml_path,
                              args.batch_size,
                              splits_augs,
-                             ecvl.ColorType.GRAY)
+                             color_type)
 
     # Data info
     in_shape = (dataset.n_channels_, *args.target_size)
@@ -153,12 +154,20 @@ if __name__ == "__main__":
         type=str)
 
     arg_parser.add_argument(
+        "--rgb",
+        help="Load the images in RGB format instead of grayscale",
+        action="store_true")
+
+    arg_parser.add_argument(
         "--model",
         help="Model architecture to train",
         default="model_1",
         type=str,
         choices=["model_1", "model_2", "model_3", "model_4",
-                 "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152"])
+                 "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152",
+                 "Pretrained_ResNet18", "Pretrained_ResNet34",
+                 "Pretrained_ResNet50", "Pretrained_ResNet101",
+                 "Pretrained_ResNet152"])
 
     arg_parser.add_argument(
         "--optimizer", "-opt",

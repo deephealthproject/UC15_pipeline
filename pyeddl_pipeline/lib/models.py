@@ -507,6 +507,57 @@ def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
     return eddl.Model([in_], [out_]), True, []
 
 
+def pretrained_resnet(in_shape: tuple,
+                      num_classes: int,
+                      version: str) -> eddl.Model:
+    """
+    Uses a pretrained ResNet to extract the convolutional block and then
+    append a new densely connected part to do the classification.
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+        version: A string to select the version of the ResNet model to use.
+                 Versions available: "18", "34", "50", "101" and "152"
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
+    # Import the pretrained ResNet model without the densely connected part
+    #   Note: the last layer name is "top"
+    if version == "18":
+        pretrained_model = eddl.download_resnet18(input_shape=in_shape)
+    elif version == "34":
+        pretrained_model = eddl.download_resnet34(input_shape=in_shape)
+    elif version == "50":
+        pretrained_model = eddl.download_resnet50(input_shape=in_shape)
+    elif version == "101":
+        pretrained_model = eddl.download_resnet101(input_shape=in_shape)
+    elif version == "152":
+        pretrained_model = eddl.download_resnet152(input_shape=in_shape)
+
+    # Get the reference to the input layer of the pretrained model
+    in_ = eddl.getLayer(pretrained_model, "input")
+    # Get the reference to the last layer of the pretrained model
+    l = eddl.getLayer(pretrained_model, "top")
+
+    # Create the new densely connected part
+    l = eddl.ReLu(eddl.Dense(l, 1024, name="dense1"))
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
+
+    return eddl.Model([in_], [out_]), False, ["dense1", "dense_out"]
+
+
 def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
     """
     Auxiliary function to create the selected model topology.
@@ -539,7 +590,7 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
     if model_name == "model_4":
         return model_4(in_shape, num_classes)
 
-    # ResNet models
+    # ResNet models (from scratch)
     if model_name == "ResNet18":
         return resnet_18(in_shape, num_classes)
     if model_name == "ResNet34":
@@ -550,5 +601,17 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
         return resnet_101(in_shape, num_classes)
     if model_name == "ResNet152":
         return resnet_152(in_shape, num_classes)
+
+    # ResNet models (pretrained from ONNX)
+    if model_name == "Pretrained_ResNet18":
+        return pretrained_resnet(in_shape, num_classes, "18")
+    if model_name == "Pretrained_ResNet34":
+        return pretrained_resnet(in_shape, num_classes, "34")
+    if model_name == "Pretrained_ResNet50":
+        return pretrained_resnet(in_shape, num_classes, "50")
+    if model_name == "Pretrained_ResNet101":
+        return pretrained_resnet(in_shape, num_classes, "101")
+    if model_name == "Pretrained_ResNet152":
+        return pretrained_resnet(in_shape, num_classes, "152")
 
     raise Exception("Wrong model name provided!")
