@@ -5,8 +5,10 @@ import os
 import argparse
 import random
 import time
+import json
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report
 from tqdm import tqdm
 import pyecvl.ecvl as ecvl
@@ -200,12 +202,23 @@ def train(model: eddl.Model,
     y = Tensor([args.batch_size, args.num_classes])  # Labels
 
     # To store and return the training results
-    history = {"loss": [], "acc": [], "val_loss": [], "val_acc": []}
+    metrics_names = ["loss", "acc", "val_loss", "val_acc"]
+    history = {metric: [] for metric in metrics_names}
     best_loss = float('inf')  # To track the best model
     best_acc = 0.0
 
-    # Check that the ckpts folder exists
-    os.makedirs(args.models_ckpts, exist_ok=True)
+    # Save the experiment config in a JSON file
+    with open(os.path.join(args.exp_path, "args.json"), 'w') as fstream:
+        json.dump(vars(args), fstream, indent=4, sort_keys=True)
+
+    # Prepare the checkpoints folder
+    exp_ckpts_path = os.path.join(args.exp_path, "ckpts")
+    os.makedirs(exp_ckpts_path, exist_ok=True)
+
+    # Prepare a CSV to store the training metrics for each epoch
+    results_df = pd.DataFrame(columns=["epoch"] + metrics_names)
+    # Path to store the results CSV
+    results_csv_path = os.path.join(args.exp_path, "train_res.csv")
 
     random.seed(args.seed)  # Seed for shuffling the data
 
@@ -293,10 +306,17 @@ def train(model: eddl.Model,
             best_acc = metrics[0]
             model_name = (f"{exp_name}_epoch-{epoch}_"
                           f"loss-{best_loss:.4f}_acc-{best_acc:.4f}.onnx")
-            model_path = os.path.join(args.models_ckpts, model_name)
+            model_path = os.path.join(exp_ckpts_path, model_name)
             print(f"New best model! Saving ONNX to: {model_path}")
             eddl.save_net_to_onnx_file(model, model_path)
             history["best_model"] = model_path
+
+        # Get the epoch metrics
+        epoch_res = {metric: history[metric][-1] for metric in metrics_names}
+        epoch_res["epoch"] = epoch
+        # Update the results CSV
+        results_df = results_df.append(epoch_res, ignore_index=True)
+        results_df.to_csv(results_csv_path, index=False)
 
     return history
 
@@ -380,11 +400,16 @@ def test(model: eddl.Model,
     # Compute a report with statistics for each target class
     report = classification_report(targets,
                                    preds,
-                                   target_names=dataset.classes_)
+                                   target_names=dataset.classes_,
+                                   output_dict=True)
 
     # Save test results
     history["loss"] = losses[0]
     history["acc"] = metrics[0]
     history["report"] = report
+
+    # Save the tests results in a JSON file
+    with open(os.path.join(args.exp_path, "test_res.json"), 'w') as fstream:
+        json.dump(history, fstream, indent=4, sort_keys=True)
 
     return history

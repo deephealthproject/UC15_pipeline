@@ -47,8 +47,10 @@ dmypy.json
 models_ckpts/
 plots/
 logs/
+experiments/
 smodel.pdf
 tmp.dot
+*.onnx
 
 # Pytorch pipeline
 lightning_logs/

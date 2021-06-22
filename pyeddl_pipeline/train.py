@@ -3,6 +3,7 @@ Main script to train the models.
 """
 import os
 import argparse
+import json
 from datetime import datetime
 
 import pyecvl.ecvl as ecvl
@@ -79,12 +80,16 @@ def main(args):
         ckpt_name = os.path.basename(args.model_ckpt)[:-5]
         exp_name += f"_ckpt-{ckpt_name}"
 
+    # Prepare the ouput directory for logs and saved models
+    args.exp_path = os.path.join(args.experiments_path, exp_name)
+    os.makedirs(args.exp_path, exist_ok=True)
+
     # Train the model
     history = train(model, dataset, exp_name, args)
     del model  # Free the memory before the testing phase
 
     # Create the plots of the training curves for loss and accuracy
-    plot_training_results(history, exp_name, args.plots_path)
+    plot_training_results(history, args.exp_path)
 
     # Load the best model f r testing
     print(f"\nGoing to load the model \"{history['best_model']}\" for testing")
@@ -112,7 +117,8 @@ def main(args):
     test_acc = test_results['acc']
     test_report = test_results['report']
     print(f"\nTest results: loss={test_loss:.4f} - acc={test_acc:.4f}")
-    print(f"Test report:\n{test_report}")
+    print("Test report:")
+    print(json.dumps(test_report, indent=4))
 
 
 if __name__ == "__main__":
@@ -203,14 +209,10 @@ if __name__ == "__main__":
         type=str)
 
     arg_parser.add_argument(
-        "--models-ckpts",
-        help="Path to the folder for saving the ONNX models checkpoints",
-        default="models_ckpts")
-
-    arg_parser.add_argument(
-        "--plots-path",
-        help="Path to the folder to store the training plots",
-        default="plots")
+        "--experiments-path", "-exp",
+        help=("Path to the folder to store the results and configuration "
+              "of each experiment"),
+        default="experiments")
 
     arg_parser.add_argument(
         "--seed",
