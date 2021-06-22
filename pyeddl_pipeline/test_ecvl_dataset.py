@@ -1,39 +1,73 @@
+import argparse
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 from pyeddl.tensor import Tensor
 
-yaml_path = "../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19.yaml"
-batch_size = 16
-H, W = 512, 512
+from lib.training import get_augmentations
 
-tr_augs = ecvl.SequentialAugmentationContainer([
-    ecvl.AugResizeDim((H, W), ecvl.InterpolationType.cubic)
-])
 
-val_augs = ecvl.SequentialAugmentationContainer([
-    ecvl.AugResizeDim((H, W), ecvl.InterpolationType.cubic)
-])
+def main(args):
+    splits_augs = get_augmentations(args.augmentations, args.target_size)
 
-te_augs = ecvl.SequentialAugmentationContainer([
-    ecvl.AugResizeDim((H, W), ecvl.InterpolationType.cubic)
-])
+    dataset = ecvl.DLDataset(args.yaml_path,
+                             args.batch_size,
+                             splits_augs,
+                             ecvl.ColorType.GRAY)
 
-dataset_augs = ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
+    in_shape = (dataset.n_channels_, *args.target_size)
+    num_classes = len(dataset.classes_)
+    print("Data INFO:")
+    print(f" - num classes: {num_classes}")
+    print(f" - input shape: {in_shape}")
 
-dataset = ecvl.DLDataset(yaml_path, batch_size, dataset_augs, ecvl.ColorType.GRAY)
+    x = Tensor([args.batch_size, *in_shape])
+    y = Tensor([args.batch_size, num_classes])
 
-num_classes = len(dataset.classes_)
-print(f"Classes: {dataset.classes_}")
+    dataset.SetSplit(ecvl.SplitType.training)
 
-x = Tensor([batch_size, dataset.n_channels_, H, W])
-y = Tensor([batch_size, num_classes])
+    dataset.LoadBatch(x, y)
 
-dataset.SetSplit(ecvl.SplitType.training)
+    print("\nBatch data:")
+    print("Images:")
+    x.info()
+    print(f"mean: {x.mean()} - max: {x.max()} - min: {x.min()}")
+    x.print()
 
-dataset.LoadBatch(x, y)
+    print("\nLabels:")
+    y.info()
+    y.print()
 
-x.info()
-print(f"mean: {x.mean()} - max: {x.max()} - min: {x.min()}")
 
-y.info()
-y.print()
+if __name__ == "__main__":
+    # Get the config from the script arguments
+    arg_parser = argparse.ArgumentParser(
+        description="Script for playing with the ECVL Dataset object",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    arg_parser.add_argument(
+        "--yaml-path",
+        help="Path to the YAML file to create the ECVL dataset",
+        default="../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19.yaml")
+
+    arg_parser.add_argument(
+        "--augmentations", "-augs",
+        help="Set of augmentations to select",
+        default="0.0",
+        choices=["0.0", "1.0", "1.1"],
+        type=str)
+
+    arg_parser.add_argument(
+        "--target-size",
+        help="Target size to resize the images, given by height and width",
+        metavar=("HEIGHT", "WIDTH"),
+        nargs=2,
+        default=[256, 256],
+        type=int)
+
+    arg_parser.add_argument(
+        "--batch-size", "-bs",
+        help="Size of the training batches of data",
+        type=int,
+        default=1)
+
+    main(arg_parser.parse_args())
