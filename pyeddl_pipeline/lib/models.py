@@ -552,7 +552,9 @@ def pretrained_resnet(in_shape: tuple,
     l = eddl.getLayer(pretrained_model, "top")
 
     # Create the new densely connected part
-    l = eddl.ReLu(eddl.Dense(l, 1024, name="dense1"))
+    input_units = l.output.shape[-1]
+    l = eddl.ReLu(eddl.Dense(l, input_units // 2, name="dense1"))
+    l = eddl.Dropout(l, 0.4)
     out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
 
     return eddl.Model([in_], [out_]), False, ["dense1", "dense_out"]
