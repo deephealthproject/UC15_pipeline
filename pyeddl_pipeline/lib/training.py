@@ -229,6 +229,12 @@ def train(model: eddl.Model,
         # Training phase #
         ##################
 
+        # Check if we have to unfreeze the weights
+        if args.is_pretrained and 0 < args.frozen_epochs < epoch:
+            print("Going to unfreeze the pretrained weights")
+            for layer_name in args.pretrained_layers:
+                eddl.setTrainable(model, layer_name, True)
+
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.training)
         shuffle_training_split(dataset)

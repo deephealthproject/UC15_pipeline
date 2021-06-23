@@ -34,13 +34,12 @@ def main(args):
     if args.model_ckpt:
         # Load the model from an ONNX file
         model = eddl.import_net_from_onnx_file(args.model_ckpt)
-        init_weights = False  # Avoid resetting the loaded weights
-        l2init = []  # All the layers have weights from the ONNX file
+        args.init_weights = False  # Avoid resetting the loaded weights
     else:
         # Create the model
-        model, init_weights, l2init = get_model(args.model,
-                                                in_shape,
-                                                num_classes)
+        model, args.init_weights, args.layers2init = get_model(args.model,
+                                                               in_shape,
+                                                               num_classes)
 
     # Create the optimizer
     opt = get_optimizer(args.optimizer, args.learning_rate)
@@ -57,11 +56,26 @@ def main(args):
                ["softmax_cross_entropy"],
                ['accuracy'],
                comp_serv,
-               init_weights)
+               args.init_weights)
 
-    if not init_weights:
+    # Check if we have to prepare a pretrained model
+    #   Note: We consider as "pretrained" a model that is created with some
+    #         pretrained layers. The models loaded from an ONNX checkpoint are
+    #         not included.
+    args.is_pretrained = False
+    if not args.init_weights and not args.model_ckpt:
+        args.is_pretrained = True
+        # Freeze the pretrained weights
+        args.pretrained_layers = []
+        if args.frozen_epochs > 0:
+            print("Going to freeze the pretrained weights")
+            for layer in model.layers:
+                if layer.name not in args.layers2init:
+                    eddl.setTrainable(model, layer.name, False)
+                    args.pretrained_layers.append(layer.name)
+
         # Initialize the new layers
-        for layer_name in l2init:
+        for layer_name in args.layers2init:
             eddl.initializeLayer(model, layer_name)
 
     eddl.summary(model)  # Print the model layers
@@ -150,6 +164,13 @@ if __name__ == "__main__":
         "--epochs",
         help="Number of epochs to train",
         default=10,
+        type=int)
+
+    arg_parser.add_argument(
+        "--frozen-epochs",
+        help=("In case of using a pretrained model, this param sets the "
+              "number of epochs with the pretrained weights frozen."),
+        default=5,
         type=int)
 
     arg_parser.add_argument(
