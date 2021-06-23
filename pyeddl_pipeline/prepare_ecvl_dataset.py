@@ -140,12 +140,13 @@ def main(args):
 
                     # Check if is a valid difference to fix the label
                     if -args.prev_days <= days_diff <= args.post_days:
-                        # Add the COVID 19 label
-                        #  Note: The extra [] are necessary
-                        new_labels = [[labels_list + ["COVID 19"]]]
+                        # Prepare the mask to select the session images
                         sessions_mask = labels_df["ReportID"] == sess_id
-                        labels_df.loc[sessions_mask, "Labels"] = new_labels
-                        sess_labels_fixed += 1
+                        # Add the COVID 19 label
+                        labels_df.loc[sessions_mask, "Labels"] = labels_df[sessions_mask]["Labels"].apply(
+                            lambda l: l + ["COVID 19"])
+                        # Update the counter of samples changed
+                        sess_labels_fixed += sessions_mask.sum()
                         break  # Don't look for more tests
 
         print(f"Sessions with 'COVID 19' label added: {sess_labels_fixed}")
