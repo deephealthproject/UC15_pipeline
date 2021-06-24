@@ -10,6 +10,7 @@ from PIL import Image
 import nibabel as nib
 from skimage import exposure
 import albumentations as A
+from matplotlib import pyplot as plt
 
 
 def png2numpy(png_path: str) -> np.ndarray:
@@ -75,13 +76,37 @@ def get_stats(img_file_path: str) -> list:
     return [img.mean(), img.std(), img.max(), img.mean(), img.shape]
 
 
-def histogram_equalization(img_path: str,
-                           img_outpath: str,
-                           hist_type: str = "adaptive",
-                           invert_img: bool = True):
+def to_rgba_with_cmap(img: np.ndarray,
+                      colormap: str = 'jet',
+                      n_colors: int = 100):
+    """
+    Using the colormap specified, converts the input image to a colored
+    RGB image.
+
+    Args:
+        colormap: Colormap to use. It must be a color map from matplotlib.
+
+        n_colors: Number of colors to use from the colormap.
+
+    Returns:
+        A numpy array with the colored image.
+    """
+    cmap = plt.get_cmap(colormap, lut=n_colors)  # Prepare the colormap
+    return cmap(img)  # Apply the colorization
+
+
+def preprocess_image(img_path: str,
+                     img_outpath: str,
+                     hist_type: str = "adaptive",
+                     invert_img: bool = True,
+                     to_rgb: bool = False,
+                     colormap: str = 'jet',
+                     n_colors: int = 100):
     """
     Applies histogram equalization to the image given and stores the
-    preprocessed version in the provided output path.
+    preprocessed version in the provided output path. Other transformations
+    can be applied if activated: invert grayscale colors or convert to RGB
+    with a colormap from matplotlib.
 
     Args:
         img_path: Path to the image to preprocess (it must be a .png).
@@ -118,12 +143,22 @@ def histogram_equalization(img_path: str,
     else:
         raise Exception("Wrong histogram equalization type provided!")
 
+    if to_rgb:
+        # Apply colorization. Te output is RGBA (H, W, 4)
+        img = to_rgba_with_cmap(img, colormap, n_colors)
+
     # After histogram equalization the values are floats in the range [0-1].
     # Convert the images to the range [0-255] with uint8 values
     img = np.uint8(img * 255.0)
 
+    # From numpy to PIL image
+    if to_rgb:
+        pil_img = Image.fromarray(img, mode='RGBA')
+        pil_img = pil_img.convert('RGB')
+    else:
+        pil_img = Image.fromarray(img, mode='L')
+
     # Store the processed image
-    pil_img = Image.fromarray(img, mode='L')
     pil_img.save(img_outpath, format="PNG")
 
 
@@ -138,6 +173,7 @@ def create_copy_with_DA(img_path: str,
         img_outpath: Path of the output .png file to create.
     """
     img = load_numpy_data(img_path)
+    n_channels = img.shape[-1]
 
     # DA operations
     transform = A.Compose([
@@ -154,5 +190,5 @@ def create_copy_with_DA(img_path: str,
     aug_img = np.uint8(transform(image=img)["image"])
 
     # Store the transformed copy
-    pil_img = Image.fromarray(aug_img, mode='L')
+    pil_img = Image.fromarray(aug_img, mode='RGB' if n_channels == 3 else 'L')
     pil_img.save(img_outpath, format="PNG")

@@ -16,7 +16,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from lib.data_processing import get_labels_from_str, create_ecvl_yaml
-from lib.image_processing import histogram_equalization, create_copy_with_DA
+from lib.image_processing import preprocess_image, create_copy_with_DA
 
 
 def main(args):
@@ -274,8 +274,14 @@ def main(args):
         orig_img_path = os.path.join(args.sub_path, row['filepath'])
         new_img_path = os.path.join(args.sub_path, new_img_relative_path)
 
+        # Add the image to the preprocessing queue
         if not os.path.isfile(new_img_path) or args.new_preproc:
-            images_to_preprocess.append((orig_img_path, new_img_path))
+            # See preprocess_image() args
+            extra_args = ("adaptive", True,
+                          args.to_rgb, args.colormap, args.n_colors)
+            images_to_preprocess.append((orig_img_path,
+                                         new_img_path,
+                                         *extra_args))
 
         # Get subject data (age, gender...)
         sub_data = subjects_df[subjects_df["participant"] == sub_id]
@@ -300,7 +306,7 @@ def main(args):
     #      2. Normalize the image using histogram equalization
     print("\nPreprocessing the images...")
     with mp.Pool(processes=args.n_proc) as pool:
-        pool.starmap(histogram_equalization, images_to_preprocess, 10)
+        pool.starmap(preprocess_image, images_to_preprocess, 10)
     print("Images preprocessed!")
 
     """
@@ -730,5 +736,23 @@ if __name__ == "__main__":
         help=("To disable the data balancing for all the splits. By default "
               "the validation and test splits are balanced."),
         action="store_true")
+
+    arg_parser.add_argument(
+        "--to-rgb",
+        help="To convert the images from grayscale to RGB using a colormap",
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--colormap",
+        help=("Name of the colormap to use for colorizing the images. "
+              "It must be a colormap from matplotlib"),
+        default='jet',
+        type=str)
+
+    arg_parser.add_argument(
+        "--n-colors",
+        help="Number of colors to use from the selected colormap",
+        default=100,
+        type=int)
 
     main(arg_parser.parse_args())
