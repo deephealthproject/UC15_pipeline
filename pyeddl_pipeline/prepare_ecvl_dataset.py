@@ -165,6 +165,9 @@ def main(args):
 
         3 - If the clean-data argument is provided. We only take the images
             that are labeled as "OK" in the TSV provided by the clean-data flag
+
+        4 - If the only-dx or only-cr (exclusive or) flag is enabled we have to
+            select only the corresponding samples
     """
 
     # 1 - Filter by labels
@@ -224,6 +227,20 @@ def main(args):
         ok_filter = selected_samples["session"].isin(ok_samples["session"])
         # Apply the filter
         selected_samples = selected_samples[ok_filter]
+
+    # 4 - Get only the DX or CR images
+
+    if args.only_dx != args.only_cr:
+        # Select the target image type
+        type_ = "dx" if args.only_dx else "cr"
+        # Get the rows of the DataFrame that are from the selected type
+        samples_filter = selected_samples.apply(
+            lambda row: type_ in row["filepath"], axis=1)  # Rows mask filter
+        # Apply the filter
+        selected_samples = selected_samples[samples_filter]
+    elif args.only_dx:  # Both are True
+        raise Exception(
+            "You can only enable one of the flags '--only-dx' or '--only-cr'")
 
     """
     Create the DataFrame with all the relevant info for each sample.
@@ -754,5 +771,17 @@ if __name__ == "__main__":
         help="Number of colors to use from the selected colormap",
         default=100,
         type=int)
+
+    arg_parser.add_argument(
+        "--only-dx",
+        help=("Only select the images that are DX. "
+              "Not available with --only-cr at the same time"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--only-cr",
+        help=("Only select the images that are CR. "
+              "Not available with --only-dx at the same time"),
+        action="store_true")
 
     main(arg_parser.parse_args())
