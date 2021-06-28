@@ -222,6 +222,8 @@ def train(model: eddl.Model,
 
     random.seed(args.seed)  # Seed for shuffling the data
 
+    avoid_unfreeze = False  # To avoid unfreezing the weights more than once
+
     print(f"Going to train for {args.epochs} epochs:")
     for epoch in range(1, args.epochs+1):
         print(f"Epoch {epoch}:")
@@ -229,11 +231,13 @@ def train(model: eddl.Model,
         # Training phase #
         ##################
 
-        # Check if we have to unfreeze the weights
-        if args.is_pretrained and 0 < args.frozen_epochs < epoch:
-            print("Going to unfreeze the pretrained weights")
-            for layer_name in args.pretrained_layers:
-                eddl.setTrainable(model, layer_name, True)
+        if not avoid_unfreeze:
+            # Check if the model must be unfreezed
+            if args.is_pretrained and 0 < args.frozen_epochs < epoch:
+                print("Going to unfreeze the pretrained weights")
+                for layer_name in args.pretrained_layers:
+                    eddl.setTrainable(model, layer_name, True)
+                avoid_unfreeze = True
 
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.training)
