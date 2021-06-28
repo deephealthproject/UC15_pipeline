@@ -30,6 +30,12 @@ def main(args):
     num_classes = len(dataset.classes_)
     args.in_shape = in_shape
     args.num_classes = num_classes
+    # Get the full dataset configuration to log it in the experiment logs
+    dataset_config_file = args.yaml_path[:-5] + "_args.json"
+    if not os.path.isfile(dataset_config_file):
+        raise Exception(f"Dataset config '{dataset_config_file}' not found!")
+    with open(dataset_config_file) as fstream:
+        args.dataset_config = json.load(fstream)
 
     if args.model_ckpt:
         # Load the model from an ONNX file

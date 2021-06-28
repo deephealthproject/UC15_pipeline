@@ -10,6 +10,7 @@ import argparse
 import ast
 import multiprocessing as mp
 import random
+import json
 
 import numpy as np
 import pandas as pd
@@ -628,7 +629,13 @@ def main(args):
         main_df, yaml_outfile, args.target_labels, args.multiclass)
     print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
 
-    print("\nYAML labels count:")
+    # Store the script config
+    config_outfile = os.path.join(args.sub_path, f"{args.yaml_name}_args.json")
+    with open(config_outfile, 'w') as fstream:
+        json.dump(vars(args), fstream, indent=4, sort_keys=True)
+    print(f'\nStored the dataset config in "{config_outfile}"')
+
+    print("\nYAML total labels count:")
     for label in stats_dict:
         print(f" - {label}: {stats_dict[label]}")
 
