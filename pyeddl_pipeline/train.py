@@ -15,6 +15,11 @@ from lib.plot_utils import plot_training_results
 
 
 def main(args):
+
+    ###################
+    # Prepare Dataset #
+    ###################
+
     # Prepare data augmentations for the splits (train, validation, test)
     splits_augs = get_augmentations(args.augmentations, args.target_size)
 
@@ -36,6 +41,10 @@ def main(args):
         raise Exception(f"Dataset config '{dataset_config_file}' not found!")
     with open(dataset_config_file) as fstream:
         args.dataset_config = json.load(fstream)
+
+    #################
+    # Prepare Model #
+    #################
 
     if args.model_ckpt:
         # Load the model from an ONNX file
@@ -104,41 +113,61 @@ def main(args):
     args.exp_path = os.path.join(args.experiments_path, exp_name)
     os.makedirs(args.exp_path, exist_ok=True)
 
-    # Train the model
+    ###############
+    # Train phase #
+    ###############
+
     history = train(model, dataset, exp_name, args)
     del model  # Free the memory before the testing phase
 
     # Create the plots of the training curves for loss and accuracy
     plot_training_results(history, args.exp_path)
 
-    # Load the best model f r testing
-    print(f"\nGoing to load the model \"{history['best_model']}\" for testing")
-    best_model = eddl.import_net_from_onnx_file(history["best_model"])
+    ##############
+    # Test phase #
+    ##############
+    """
+    In this phase we test the best models from the train phase:
+        1 - The best model by validation loss
+        2 - The best model by validation accuracy
+    """
 
-    # Create the optimizer
-    opt = get_optimizer(args.optimizer, args.learning_rate)
+    models2test = ["best_model_byloss", "best_model_byacc"]
 
-    # Get the computing device
-    if args.cpu:
-        comp_serv = eddl.CS_CPU(-1, args.mem_level)
-    else:
-        comp_serv = eddl.CS_GPU(args.gpus, 1, args.mem_level)
+    for model_name in models2test:
+        print(("\nGoing to load the model "
+              f"\"{history[model_name]}\" for testing"))
+        best_model = eddl.import_net_from_onnx_file(history[model_name])
 
-    eddl.build(best_model,
-               opt,
-               ["softmax_cross_entropy"],
-               ['accuracy'],
-               comp_serv,
-               False)  # Avoid weights initialization
+        # Create the optimizer
+        opt = get_optimizer(args.optimizer, args.learning_rate)
 
-    # Inference on test split
-    test_results = test(best_model, dataset, args)
-    test_loss = test_results['loss']
-    test_acc = test_results['acc']
-    test_report = test_results['report']
-    print(f"\nTest results: loss={test_loss:.4f} - acc={test_acc:.4f}")
-    print("Test report:")
-    print(json.dumps(test_report, indent=4))
+        # Get the computing device
+        if args.cpu:
+            comp_serv = eddl.CS_CPU(-1, args.mem_level)
+        else:
+            comp_serv = eddl.CS_GPU(args.gpus, 1, args.mem_level)
+
+        eddl.build(best_model,
+                   opt,
+                   ["softmax_cross_entropy"],
+                   ['accuracy'],
+                   comp_serv,
+                   False)  # Avoid weights initialization
+
+        # Inference on test split
+        test_results = test(best_model,
+                            dataset,
+                            args,
+                            f"test_res_{model_name}.json")
+        # Show tests results
+        print(f"\nTest results of '{model_name}':")
+        print(f"  - loss={test_results['loss']:.4f}")
+        print(f"  - acc={test_results['acc']:.4f}")
+        print("\nTest report:")
+        print(json.dumps(test_results['report'], indent=4))
+
+        del best_model  # Free the memory for the next model
 
 
 if __name__ == "__main__":

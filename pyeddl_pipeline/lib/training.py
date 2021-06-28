@@ -190,7 +190,10 @@ def train(model: eddl.Model,
             - acc: Accuracy of each epoch with the training split
             - val_loss: Loss of each epoch with the validation split
             - val_acc: Accuracy of each epoch with the validation split
-            - best_model: Path to the ONNX file with the best model
+            - best_model_byloss: Path to the ONNX file with the best model
+                                 selected by val_loss
+            - best_model_byacc: Path to the ONNX file with the best model
+                                selected by val_acc
     """
     n_train_samples = len(dataset.GetSplit(ecvl.SplitType.training))
     n_train_batches = n_train_samples // args.batch_size
@@ -311,15 +314,41 @@ def train(model: eddl.Model,
         history["val_loss"].append(losses[0])
         history["val_acc"].append(metrics[0])
 
-        if losses[0] < best_loss:
+        # Save the best models by val_loss and val_acc to ONNX
+        new_best_loss = losses[0] < best_loss
+        new_best_acc = metrics[0] > best_acc
+        if new_best_loss and new_best_acc:
             best_loss = losses[0]
             best_acc = metrics[0]
             model_name = (f"{exp_name}_epoch-{epoch}_"
-                          f"loss-{best_loss:.4f}_acc-{best_acc:.4f}.onnx")
+                          f"loss-{best_loss:.4f}_acc-{best_acc:.4f}_"
+                          "by-loss-and-acc.onnx")
             model_path = os.path.join(exp_ckpts_path, model_name)
-            print(f"New best model! Saving ONNX to: {model_path}")
+            print(("New best model by val_loss and val_acc! "
+                  f"Saving ONNX to: {model_path}"))
             eddl.save_net_to_onnx_file(model, model_path)
-            history["best_model"] = model_path
+            history["best_model_byloss"] = model_path
+            history["best_model_byacc"] = model_path
+        elif new_best_acc:
+            aux_loss = losses[0]
+            best_acc = metrics[0]
+            model_name = (f"{exp_name}_epoch-{epoch}_"
+                          f"loss-{aux_loss:.4f}_acc-{best_acc:.4f}_"
+                          "by-acc.onnx")
+            model_path = os.path.join(exp_ckpts_path, model_name)
+            print(f"New best model by val_acc! Saving ONNX to: {model_path}")
+            eddl.save_net_to_onnx_file(model, model_path)
+            history["best_model_byacc"] = model_path
+        elif new_best_loss:
+            best_loss = losses[0]
+            aux_acc = metrics[0]
+            model_name = (f"{exp_name}_epoch-{epoch}_"
+                          f"loss-{best_loss:.4f}_acc-{aux_acc:.4f}_"
+                          "by-loss.onnx")
+            model_path = os.path.join(exp_ckpts_path, model_name)
+            print(f"New best model by val_loss! Saving ONNX to: {model_path}")
+            eddl.save_net_to_onnx_file(model, model_path)
+            history["best_model_byloss"] = model_path
 
         # Get the epoch metrics
         epoch_res = {metric: history[metric][-1] for metric in metrics_names}
@@ -333,7 +362,8 @@ def train(model: eddl.Model,
 
 def test(model: eddl.Model,
          dataset: ecvl.DLDataset,
-         args: argparse.Namespace) -> list:
+         args: argparse.Namespace,
+         out_filename: str = "test_res.json") -> list:
     """
     Performs the model evaluation with the test split.
 
@@ -344,6 +374,9 @@ def test(model: eddl.Model,
 
         args: The argparse object with all the configuration data like:
               batch_size, epochs...
+
+        out_filename: Name of the JSON file to create inside the experiment
+                      folder with the test results
 
     Returns:
         A dictionary with a summary of the testing phase.
@@ -419,7 +452,7 @@ def test(model: eddl.Model,
     history["report"] = report
 
     # Save the tests results in a JSON file
-    with open(os.path.join(args.exp_path, "test_res.json"), 'w') as fstream:
+    with open(os.path.join(args.exp_path, out_filename), 'w') as fstream:
         json.dump(history, fstream, indent=4, sort_keys=True)
 
     return history
