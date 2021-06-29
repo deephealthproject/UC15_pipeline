@@ -229,7 +229,8 @@ if __name__ == "__main__":
                  "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152",
                  "Pretrained_ResNet18", "Pretrained_ResNet34",
                  "Pretrained_ResNet50", "Pretrained_ResNet101",
-                 "Pretrained_ResNet152"])
+                 "Pretrained_ResNet152",
+                 "Pretrained_VGG16", "Pretrained_VGG19BN"])
 
     arg_parser.add_argument(
         "--optimizer", "-opt",

@@ -1,7 +1,9 @@
 """
 Module to create the models architectures.
 """
+import os
 from typing import Callable
+import urllib.request
 
 import pyeddl.eddl as eddl
 
@@ -560,6 +562,123 @@ def pretrained_resnet(in_shape: tuple,
     return eddl.Model([in_], [out_]), False, ["dense1", "dense_out"]
 
 
+def pretrained_vgg16(in_shape: tuple,
+                     num_classes: int) -> eddl.Model:
+    """
+    Uses a pretrained VGG16 to extract the convolutional block and then
+    append a new densely connected part to do the classification.
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
+    # Import the pretrained VGG16 model without the densely connected part
+    #   Note: the last layer name is "top"
+    pretrained_model = eddl.download_vgg16(input_shape=in_shape)
+
+    # Get the reference to the input layer of the pretrained model
+    in_ = eddl.getLayer(pretrained_model, "input")
+    # Get the reference to the last layer of the pretrained conv block
+    l = eddl.getLayer(pretrained_model, "top")
+
+    # Create the new densely connected part
+    input_units = l.output.shape[-1]
+    l = eddl.ReLu(eddl.Dense(l, input_units // 4, name="dense1"))
+    l = eddl.Dropout(l, 0.5)
+    l = eddl.ReLu(eddl.Dense(l, input_units // 16, name="dense2"))
+    l = eddl.Dropout(l, 0.5)
+    l = eddl.ReLu(eddl.Dense(l, input_units // 64, name="dense3"))
+    l = eddl.Dropout(l, 0.5)
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
+
+    # This layers must be initialized because they are not pretrained
+    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+
+    return eddl.Model([in_], [out_]), False, layer2init
+
+
+def pretrained_vgg19BN(in_shape: tuple,
+                       num_classes: int,
+                       out_path: str = "vgg19_bn.onnx") -> eddl.Model:
+    """
+    Uses a pretrained VGG19 with BN to extract the convolutional block and then
+    append a new densely connected part to do the classification.
+
+    Args:
+        in_shape: Input shape of the model (channels, height, width).
+
+        num_classes: Number of units for the output Dense layer.
+
+        out_path: Output file path to store the dowloaded pretrained model.
+
+    Returns:
+        A list with:
+            - The EDDL model object.
+
+            - Boolean to indicate if the weights must be initialized.
+
+            - A list with the layer names that should be initialized in case
+              of passing False in the previous output value. Useful when using
+              a pretrained convolutional block followed by a new set of Dense
+              layers for classification.
+    """
+    if not os.path.isfile(out_path):
+        # Download the model
+        model_url = "https://github.com/onnx/models/raw/master/vision/classification/vgg/model/vgg19-bn-7.onnx"
+        with urllib.request.urlopen(model_url) as raw_data:
+            onnx_file = raw_data.read()  # Read the raw bytes of the ONNX
+            with open(out_path, 'wb') as ostream:
+                ostream.write(onnx_file)  # Write the bytes to an ONNX file
+    else:
+        print(f"ONNX file '{out_path}' found! Skipping the download")
+
+    # Load the model from ONNX
+    pretrained_model = eddl.import_net_from_onnx_file(out_path,
+                                                      input_shape=in_shape)
+    # Remove the densely connected block
+    eddl.removeLayer(pretrained_model, "vgg0_dense2_fwd")
+    eddl.removeLayer(pretrained_model, "flatten_162")
+    eddl.removeLayer(pretrained_model, "vgg0_dropout1_fwd")
+    eddl.removeLayer(pretrained_model, "vgg0_dense1_relu_fwd")
+    eddl.removeLayer(pretrained_model, "vgg0_dense1_fwd")
+    eddl.removeLayer(pretrained_model, "flatten_157")
+    eddl.removeLayer(pretrained_model, "vgg0_dropout0_fwd")
+    eddl.removeLayer(pretrained_model, "vgg0_dense0_relu_fwd")
+    eddl.removeLayer(pretrained_model, "vgg0_dense0_fwd")
+
+    # Get the reference to the input layer of the pretrained model
+    in_ = eddl.getLayer(pretrained_model, "data")
+    # Get the reference to the last layer of the convolutional part
+    l = eddl.getLayer(pretrained_model, "flatten_152")
+
+    # Create the new densely connected part
+    input_units = l.output.shape[-1]
+    l = eddl.ReLu(eddl.Dense(l, input_units // 4, name="dense1"))
+    l = eddl.Dropout(l, 0.5)
+    l = eddl.ReLu(eddl.Dense(l, input_units // 16, name="dense2"))
+    l = eddl.Dropout(l, 0.5)
+    l = eddl.ReLu(eddl.Dense(l, input_units // 64, name="dense3"))
+    l = eddl.Dropout(l, 0.5)
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
+
+    # This layers must be initialized because they are not pretrained
+    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+
+    return eddl.Model([in_], [out_]), False, layer2init
+
+
 def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
     """
     Auxiliary function to create the selected model topology.
@@ -615,5 +734,11 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
         return pretrained_resnet(in_shape, num_classes, "101")
     if model_name == "Pretrained_ResNet152":
         return pretrained_resnet(in_shape, num_classes, "152")
+
+    # VGG models
+    if model_name == "Pretrained_VGG16":
+        return pretrained_vgg16(in_shape, num_classes)
+    if model_name == "Pretrained_VGG19BN":
+        return pretrained_vgg19BN(in_shape, num_classes)
 
     raise Exception("Wrong model name provided!")
