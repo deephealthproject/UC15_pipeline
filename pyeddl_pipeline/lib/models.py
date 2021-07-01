@@ -209,7 +209,7 @@ def residual_block(in_layer,  # A EDDL layer
 def build_resnet(in_shape: tuple,
                  num_classes: int,
                  block_type: Callable,
-                 n_blocks: list):
+                 n_blocks: list) -> list:
     """
     Parametrized constructor to build every variant of the ResNet architecture.
 
@@ -263,23 +263,23 @@ def build_resnet(in_shape: tuple,
     return eddl.Model([in_], [out_]), True, []
 
 
-def resnet_18(in_shape: tuple, num_classes: int) -> eddl.Model:
+def resnet_18(in_shape: tuple, num_classes: int) -> list:
     return build_resnet(in_shape, num_classes, basic_block, [2, 2, 2, 2])
 
 
-def resnet_34(in_shape: tuple, num_classes: int) -> eddl.Model:
+def resnet_34(in_shape: tuple, num_classes: int) -> list:
     return build_resnet(in_shape, num_classes, basic_block, [3, 4, 6, 3])
 
 
-def resnet_50(in_shape: tuple, num_classes: int) -> eddl.Model:
+def resnet_50(in_shape: tuple, num_classes: int) -> list:
     return build_resnet(in_shape, num_classes, bottleneck_block, [3, 4, 6, 3])
 
 
-def resnet_101(in_shape: tuple, num_classes: int) -> eddl.Model:
+def resnet_101(in_shape: tuple, num_classes: int) -> list:
     return build_resnet(in_shape, num_classes, bottleneck_block, [3, 4, 23, 3])
 
 
-def resnet_152(in_shape: tuple, num_classes: int) -> eddl.Model:
+def resnet_152(in_shape: tuple, num_classes: int) -> list:
     return build_resnet(in_shape, num_classes, bottleneck_block, [3, 8, 36, 3])
 
 
@@ -287,7 +287,7 @@ def resnet_152(in_shape: tuple, num_classes: int) -> eddl.Model:
 # CUSTOM MODELS #
 #################
 
-def model_1(in_shape: tuple, num_classes: int) -> eddl.Model:
+def model_1(in_shape: tuple, num_classes: int) -> list:
     """
     Creates an EDDL model with the topology 'model_1'
 
@@ -328,7 +328,7 @@ def model_1(in_shape: tuple, num_classes: int) -> eddl.Model:
     return eddl.Model([in_], [out_]), True, []
 
 
-def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
+def model_2(in_shape: tuple, num_classes: int) -> list:
     """
     Creates an EDDL model with the topology 'model_2'
 
@@ -371,7 +371,7 @@ def model_2(in_shape: tuple, num_classes: int) -> eddl.Model:
     return eddl.Model([in_], [out_]), True, []
 
 
-def model_3(in_shape: tuple, num_classes: int) -> eddl.Model:
+def model_3(in_shape: tuple, num_classes: int) -> list:
     """
     Creates an EDDL model with the topology 'model_3'
 
@@ -435,7 +435,7 @@ def model_3(in_shape: tuple, num_classes: int) -> eddl.Model:
     return eddl.Model([in_], [out_]), True, []
 
 
-def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
+def model_4(in_shape: tuple, num_classes: int) -> list:
     """
     Creates an EDDL model with the topology 'model_4'
 
@@ -511,7 +511,7 @@ def model_4(in_shape: tuple, num_classes: int) -> eddl.Model:
 
 def pretrained_resnet(in_shape: tuple,
                       num_classes: int,
-                      version: str) -> eddl.Model:
+                      version: str) -> list:
     """
     Uses a pretrained ResNet to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -555,15 +555,16 @@ def pretrained_resnet(in_shape: tuple,
 
     # Create the new densely connected part
     input_units = l.output.shape[-1]
-    l = eddl.ReLu(eddl.Dense(l, input_units // 2, name="dense1"))
-    l = eddl.Dropout(l, 0.4)
+    l = eddl.Dense(l, input_units // 2, name="dense1")
+    l = eddl.ReLu(l, name="dense1_relu")
+    l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
 
     return eddl.Model([in_], [out_]), False, ["dense1", "dense_out"]
 
 
 def pretrained_vgg16(in_shape: tuple,
-                     num_classes: int) -> eddl.Model:
+                     num_classes: int) -> list:
     """
     Uses a pretrained VGG16 to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -595,12 +596,18 @@ def pretrained_vgg16(in_shape: tuple,
 
     # Create the new densely connected part
     input_units = l.output.shape[-1]
-    l = eddl.ReLu(eddl.Dense(l, input_units // 4, name="dense1"))
-    l = eddl.Dropout(l, 0.5)
-    l = eddl.ReLu(eddl.Dense(l, input_units // 16, name="dense2"))
-    l = eddl.Dropout(l, 0.5)
-    l = eddl.ReLu(eddl.Dense(l, input_units // 64, name="dense3"))
-    l = eddl.Dropout(l, 0.5)
+    # Dense 1
+    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.ReLu(l, name="dense1_relu")
+    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    # Dense 2
+    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.ReLu(l, name="dense2_relu")
+    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    # Dense 3
+    l = eddl.Dense(l, input_units // 64, name="dense3")
+    l = eddl.ReLu(l, name="dense3_relu")
+    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
 
     # This layers must be initialized because they are not pretrained
@@ -611,7 +618,7 @@ def pretrained_vgg16(in_shape: tuple,
 
 def pretrained_vgg19BN(in_shape: tuple,
                        num_classes: int,
-                       out_path: str = "vgg19_bn.onnx") -> eddl.Model:
+                       out_path: str = "vgg19_bn.onnx") -> list:
     """
     Uses a pretrained VGG19 with BN to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -665,12 +672,18 @@ def pretrained_vgg19BN(in_shape: tuple,
 
     # Create the new densely connected part
     input_units = l.output.shape[-1]
-    l = eddl.ReLu(eddl.Dense(l, input_units // 4, name="dense1"))
-    l = eddl.Dropout(l, 0.5)
-    l = eddl.ReLu(eddl.Dense(l, input_units // 16, name="dense2"))
-    l = eddl.Dropout(l, 0.5)
-    l = eddl.ReLu(eddl.Dense(l, input_units // 64, name="dense3"))
-    l = eddl.Dropout(l, 0.5)
+    # Dense 1
+    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.ReLu(l, name="dense1_relu")
+    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    # Dense 2
+    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.ReLu(l, name="dense2_relu")
+    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    # Dense 3
+    l = eddl.Dense(l, input_units // 64, name="dense3")
+    l = eddl.ReLu(l, name="dense3_relu")
+    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
 
     # This layers must be initialized because they are not pretrained
@@ -679,7 +692,7 @@ def pretrained_vgg19BN(in_shape: tuple,
     return eddl.Model([in_], [out_]), False, layer2init
 
 
-def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
+def get_model(model_name: str, in_shape: tuple, num_classes: int) -> list:
     """
     Auxiliary function to create the selected model topology.
 
@@ -742,3 +755,94 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int) -> eddl.Model:
         return pretrained_vgg19BN(in_shape, num_classes)
 
     raise Exception("Wrong model name provided!")
+
+
+#####################
+# Transfer learning #
+#####################
+
+def extract_pretrained_layers(model: eddl.Model,
+                              layers2remove: list,
+                              input_name: str,
+                              last_name: str) -> list:
+    """
+    This function removes the selected layers of a model to extract the desired
+    pretrained block.
+    Note: The input model will be modified.
+
+    Args:
+        model: Model to extract the layers from.
+
+        layers2remove: List with the names of the layers that we are going
+                       to remove.
+
+        input_name: Name of the input layer of the model.
+
+        last_name: Name of the last layer of the pretrained block that we want
+                   to extract.
+
+    Returns:
+        A list with:
+            - A reference to the input layer of the model.
+
+            - A reference to the last layer of the pretrained block.
+    """
+    # Remove the selected layers
+    for layer_name in layers2remove:
+        eddl.removeLayer(model, layer_name)
+
+    # Get the reference to the input layer of the model
+    in_ = eddl.getLayer(model, input_name)
+    # Get the reference to the last layer of the convolutional part
+    out_ = eddl.getLayer(model, last_name)
+
+    return in_, out_
+
+
+def get_model_tl(onnx_file: str,
+                 model_name: str,
+                 in_shape: tuple,
+                 num_classes: int) -> list:
+    """
+    Auxiliary function to use transfer learning to load the ONNX provided and
+    change the fully connected layers for the new classification task.
+
+    Args:
+        onnx_file: Path to the ONNX file to load.
+
+        model_name: Name of the architecture used to create the ONNX file.
+
+        in_shape: Tuple with the input shape of the model (without batch dim).
+
+        num_classes: Number of units in the last layer for classification.
+
+    Returns:
+        A list with:
+            - The EDDL model object (not built).
+
+            - A list with the layer names that should be initialized (usually
+              the new dense layers added).
+    """
+    # Load the model from ONNX
+    pretrained_model = eddl.import_net_from_onnx_file(onnx_file,
+                                                      input_shape=in_shape)
+    if model_name == "ResNet50":
+        layers2remove = ["softmax50", "dense1"]
+        in_, conv_out = extract_pretrained_layers(pretrained_model,
+                                                  layers2remove,
+                                                  "input1",
+                                                  "reshape1")
+    else:
+        raise Exception("Wrong model name provided!")
+
+    # Add the new dense layer for classification
+    input_units = conv_out.output.shape[-1]  # conv_out is a Flatten layer
+    l = eddl.Dense(conv_out, input_units // 4, name="dense1")
+    l = eddl.BatchNormalization(l, True, name="dense1_bn")
+    l = eddl.ReLu(l, name="dense1_relu")
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
+
+    # This layers must be initialized because they are not pretrained
+    layer2init = ["dense1", "dense1_bn", "dense_out"]
+
+    return eddl.Model([in_], [out_]), layer2init

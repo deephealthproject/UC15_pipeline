@@ -10,7 +10,7 @@ import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 
 from lib.training import get_augmentations, get_optimizer, train, test
-from lib.models import get_model
+from lib.models import get_model, get_model_tl
 from lib.plot_utils import plot_training_results
 
 
@@ -47,11 +47,18 @@ def main(args):
     #################
 
     if args.model_ckpt:
-        # Load the model from an ONNX file
+        # Load the model from an ONNX file to use it as a checkpoint
         model = eddl.import_net_from_onnx_file(args.model_ckpt)
         args.init_weights = False  # Avoid resetting the loaded weights
+    elif args.pretrained_onnx:
+        # Use transfer learning with a pretrained model in ONNX
+        model, args.layers2init = get_model_tl(args.pretrained_onnx,
+                                               args.model,
+                                               in_shape,
+                                               num_classes)
+        args.init_weights = False  # Avoid resetting the loaded weights
     else:
-        # Create the model
+        # Create a new model
         model, args.init_weights, args.layers2init = get_model(args.model,
                                                                in_shape,
                                                                num_classes)
@@ -105,11 +112,11 @@ def main(args):
                 f"_lr-{args.learning_rate}")
 
     if args.model_ckpt:
-        # Get the name by taking the filename and removing the .onnx extension
-        ckpt_name = os.path.basename(args.model_ckpt)[:-5]
-        exp_name += f"_ckpt-{ckpt_name}"
+        exp_name += "_from-ckpt"
+    elif args.pretrained_onnx:
+        exp_name += "_from-pretrained-onnx"
 
-    # Prepare the ouput directory for logs and saved models
+        # Prepare the ouput directory for logs and saved models
     args.exp_path = os.path.join(args.experiments_path, exp_name)
     os.makedirs(args.exp_path, exist_ok=True)
 
@@ -280,6 +287,14 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--model-ckpt",
         help="An ONNX model checkpoint to start training from",
+        type=str)
+
+    arg_parser.add_argument(
+        "--pretrained-onnx",
+        help=("An ONNX file to use as a pretrained model to extract the "
+              "layers of interest (usually the conv block) and then add a new "
+              "densely connected block to classify. IMPORTANT: Provide the "
+              "corresponding model architecture with the --model flag."),
         type=str)
 
     main(arg_parser.parse_args())
