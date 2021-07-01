@@ -654,26 +654,26 @@ def pretrained_vgg19BN(in_shape: tuple,
     # Load the model from ONNX
     pretrained_model = eddl.import_net_from_onnx_file(out_path,
                                                       input_shape=in_shape)
+    # Layers of the dense block to remove
+    layers2remove = ["vgg0_dense2_fwd",
+                     "flatten_162",
+                     "vgg0_dropout1_fwd",
+                     "vgg0_dense1_relu_fwd",
+                     "vgg0_dense1_fwd",
+                     "flatten_157",
+                     "vgg0_dropout0_fwd",
+                     "vgg0_dense0_relu_fwd",
+                     "vgg0_dense0_fwd"]
     # Remove the densely connected block
-    eddl.removeLayer(pretrained_model, "vgg0_dense2_fwd")
-    eddl.removeLayer(pretrained_model, "flatten_162")
-    eddl.removeLayer(pretrained_model, "vgg0_dropout1_fwd")
-    eddl.removeLayer(pretrained_model, "vgg0_dense1_relu_fwd")
-    eddl.removeLayer(pretrained_model, "vgg0_dense1_fwd")
-    eddl.removeLayer(pretrained_model, "flatten_157")
-    eddl.removeLayer(pretrained_model, "vgg0_dropout0_fwd")
-    eddl.removeLayer(pretrained_model, "vgg0_dense0_relu_fwd")
-    eddl.removeLayer(pretrained_model, "vgg0_dense0_fwd")
-
-    # Get the reference to the input layer of the pretrained model
-    in_ = eddl.getLayer(pretrained_model, "data")
-    # Get the reference to the last layer of the convolutional part
-    l = eddl.getLayer(pretrained_model, "flatten_152")
+    in_, conv_out = extract_pretrained_layers(pretrained_model,
+                                              layers2remove,
+                                              input_name="data",
+                                              last_name="flatten_152")
 
     # Create the new densely connected part
-    input_units = l.output.shape[-1]
+    input_units = conv_out.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.Dense(conv_out, input_units // 4, name="dense1")
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.5, name="dense1_dropout")
     # Dense 2
