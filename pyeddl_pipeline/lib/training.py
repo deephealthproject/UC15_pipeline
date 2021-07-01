@@ -28,6 +28,7 @@ def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
     """
     tr_augs = ecvl.SequentialAugmentationContainer([
         ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugMirror(p=0.5),
         ecvl.AugRotate([-10, 10]),
         ecvl.AugBrightness([0, 50]),
         ecvl.AugGammaContrast([0.8, 1.2]),
@@ -55,6 +56,7 @@ def augmentations_v1_1(size: tuple) -> ecvl.DatasetAugmentations:
     """
     tr_augs = ecvl.SequentialAugmentationContainer([
         ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugMirror(p=0.5),
         ecvl.AugRotate([-15, 15]),
         ecvl.AugBrightness([0, 70]),
         ecvl.AugGammaContrast([0.6, 1.4]),
