@@ -283,23 +283,27 @@ def main(args):
 
         # Get the list of target labels ("COVID 19", "normal",...)
         row_labels = row_labels["Labels"].values[0]
-
-        # This path must be relative to the folder of the output YAML
-        new_img_relative_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
-
-        # Add the image to the preprocessing queue with the input and output
-        # paths for the preprocessing function
+        # Get the path to the original image
         orig_img_path = os.path.join(args.sub_path, row['filepath'])
-        new_img_path = os.path.join(args.sub_path, new_img_relative_path)
 
-        # Add the image to the preprocessing queue
-        if not os.path.isfile(new_img_path) or args.new_preproc:
-            # See preprocess_image() args
-            extra_args = ("adaptive", True,
-                          args.to_rgb, args.colormap, args.n_colors)
-            images_to_preprocess.append((orig_img_path,
-                                         new_img_path,
-                                         *extra_args))
+        if not args.avoid_preproc:
+            # This path must be relative to the folder of the output YAML
+            new_img_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
+
+            # Add the image to the preprocessing queue with the input and output
+            # paths for the preprocessing function
+            new_img_path = os.path.join(args.sub_path, new_img_path)
+
+            # Add the image to the preprocessing queue
+            if not os.path.isfile(new_img_path) or args.new_preproc:
+                # See preprocess_image() args
+                extra_args = ("adaptive", True,
+                              args.to_rgb, args.colormap, args.n_colors)
+                images_to_preprocess.append((orig_img_path,
+                                             new_img_path,
+                                             *extra_args))
+        else:
+            new_img_path = row['filepath']  # Use the original image
 
         # Get subject data (age, gender...)
         sub_data = subjects_df[subjects_df["participant"] == sub_id]
@@ -310,7 +314,7 @@ def main(args):
         # Add the a row to the main DataFrame with the collected data
         new_row = {'subject': sub_id,
                    'session': sess_id,
-                   'filepath': new_img_relative_path,
+                   'filepath': new_img_path,
                    'labels': row_labels,
                    'gender': sub_gender,
                    'age': sub_age}
@@ -322,10 +326,15 @@ def main(args):
     #         this by looking at the image metadata.
     #
     #      2. Normalize the image using histogram equalization
-    print("\nPreprocessing the images...")
-    with mp.Pool(processes=args.n_proc) as pool:
-        pool.starmap(preprocess_image, images_to_preprocess, 10)
-    print("Images preprocessed!")
+    if not args.avoid_preproc:
+        print("\nPreprocessing the images...")
+        with mp.Pool(processes=args.n_proc) as pool:
+            pool.starmap(preprocess_image, images_to_preprocess, 10)
+        print("Images preprocessed!")
+    else:
+        assert len(images_to_preprocess) == 0  # Sanity check
+        print("\nAvoiding image preprocessing. Going to use the paths to the "
+              "original images")
 
     """
     Create the splits (training, validation, test).
@@ -543,16 +552,24 @@ def main(args):
                 # Add the fixed number of copies for each sample
                 for idx, row in samples_to_copy.iterrows():
                     for copy_idx in range(n_copies):
-                        # Create the filepath of the new copy
-                        #  Note: This path is relative to the YAML file
                         orig_path = row["filepath"]
-                        new_path = orig_path[:-4] + f"_DA-{copy_idx}" + ".png"
-                        # Create the paths for creating the copies
-                        orig_img_path = os.path.join(args.sub_path, orig_path)
-                        new_img_path = os.path.join(args.sub_path, new_path)
-                        # Add the sample to the data augmentaion queue
-                        if not os.path.isfile(new_img_path) or args.new_preproc:
-                            images_to_aug.append((orig_img_path, new_img_path))
+                        if not args.avoid_preproc:
+                            # Create the filepath of the new copy
+                            # Note: This path is relative to the YAML file
+                            new_path = orig_path[:-4] + f"_DA-{copy_idx}.png"
+
+                            # Create the paths for creating the copies
+                            orig_img_path = os.path.join(args.sub_path,
+                                                         orig_path)
+                            new_img_path = os.path.join(args.sub_path,
+                                                        new_path)
+
+                            # Add the sample to the data augmentaion queue
+                            if not os.path.isfile(new_img_path) or args.new_preproc:
+                                images_to_aug.append((orig_img_path,
+                                                      new_img_path))
+                        else:
+                            new_path = orig_path  # Use the original image
 
                         # Add the copy to the main dataframe
                         new_row = {'subject': row["subject"],
@@ -573,15 +590,24 @@ def main(args):
                     samples_to_copy = label_samples.iloc[rand_select]
                     copy_idx = n_copies
                     for idx, row in samples_to_copy.iterrows():
-                        # Create the filepath of the new copy
                         orig_path = row["filepath"]
-                        new_path = orig_path[:-4] + f"_DA-{copy_idx}" + ".png"
-                        # Create the paths for creating the copies
-                        orig_img_path = os.path.join(args.sub_path, orig_path)
-                        new_img_path = os.path.join(args.sub_path, new_path)
-                        # Add the sample to the data augmentaion queue
-                        if not os.path.isfile(new_img_path) or args.new_preproc:
-                            images_to_aug.append((orig_img_path, new_img_path))
+                        if not args.avoid_preproc:
+                            # Create the filepath of the new copy
+                            # Note: This path is relative to the YAML file
+                            new_path = orig_path[:-4] + f"_DA-{copy_idx}.png"
+
+                            # Create the paths for creating the copies
+                            orig_img_path = os.path.join(args.sub_path,
+                                                         orig_path)
+                            new_img_path = os.path.join(args.sub_path,
+                                                        new_path)
+
+                            # Add the sample to the data augmentaion queue
+                            if not os.path.isfile(new_img_path) or args.new_preproc:
+                                images_to_aug.append((orig_img_path,
+                                                      new_img_path))
+                        else:
+                            new_path = orig_path  # Use the original image
 
                         # Add the copy to the main dataframe
                         new_row = {'subject': row["subject"],
@@ -594,10 +620,16 @@ def main(args):
                         main_df = main_df.append(new_row, ignore_index=True)
 
             # Apply the augmentaions to the images (in parallel)
-            print("\nCreating augmented copies of the images...")
-            with mp.Pool(processes=args.n_proc) as pool:
-                pool.starmap(create_copy_with_DA, images_to_aug, 10)
-            print("Images created!")
+            if not args.avoid_preproc:
+                print("\nCreating augmented copies of the images...")
+                with mp.Pool(processes=args.n_proc) as pool:
+                    pool.starmap(create_copy_with_DA, images_to_aug, 10)
+                print("Images created!")
+            else:
+                assert len(images_to_aug) == 0  # Sanity check
+                print("\nAvoiding the creation of copies with DA to balance "
+                      "the dataset using oversampling. Going to create "
+                      "regular copies instead")
 
         elif args.train_balancing_type == "undersampling":
             raise Exception("Undersampling is not implemented!")
@@ -738,6 +770,13 @@ if __name__ == "__main__":
         "--new-preproc",
         help=("If not set the script tries to use a previously preprocessed "
               "image (if it exists), else the preprocessing is always done"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--avoid-preproc",
+        help=("If set the script avoids any type of image preprocessing and "
+              "only creates the final YAML file with the paths to the "
+              "original images"),
         action="store_true")
 
     arg_parser.add_argument(
