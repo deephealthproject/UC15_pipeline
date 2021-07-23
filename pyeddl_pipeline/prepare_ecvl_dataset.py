@@ -11,6 +11,7 @@ import ast
 import multiprocessing as mp
 import random
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -169,6 +170,9 @@ def main(args):
 
         4 - If the only-dx or only-cr (exclusive or) flag is enabled we have to
             select only the corresponding samples
+
+        5 - Remove the samples that are in the list of images to remove (
+            provided with the flag --images-to-avoid)
     """
 
     # 1 - Filter by labels
@@ -242,6 +246,28 @@ def main(args):
     elif args.only_dx:  # Both are True
         raise Exception(
             "You can only enable one of the flags '--only-dx' or '--only-cr'")
+
+    # 5 - Remove the images to avoid (argument --images-to-avoid)
+
+    if args.images_to_avoid:
+        print("\nGoing to remove the images to avoid listed "
+              f"in '{args.images_to_avoid}'")
+        # Use regular expresions to get the session ID of the sample
+        # Note: The sessions IDs are unique and can be used to filter
+        ses_regex = re.compile(r'ses-E\d+')
+        with open(args.images_to_avoid, 'r') as images_list:
+            sessions2avoid = []  # To store the invalid sessions
+            for line in images_list.readlines():
+                ses_id = ses_regex.findall(line)
+                assert len(ses_id)  # There must be at least one match always
+                sessions2avoid.append(ses_id[0])
+
+        # Filter the samples dataframe
+        n_before = len(selected_samples.index)
+        rows2avoid_filter = selected_samples['session'].isin(sessions2avoid)
+        selected_samples = selected_samples[~rows2avoid_filter]
+        n_after = len(selected_samples.index)
+        print(f"Removed {n_before - n_after} samples")
 
     """
     Create the DataFrame with all the relevant info for each sample.
@@ -778,6 +804,12 @@ if __name__ == "__main__":
               "only creates the final YAML file with the paths to the "
               "original images"),
         action="store_true")
+
+    arg_parser.add_argument(
+        "--images-to-avoid",
+        help=("Path to a txt file with a list of images paths to avoid"),
+        default=None,
+        type=str)
 
     arg_parser.add_argument(
         "--yaml-name",
