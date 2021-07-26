@@ -1,0 +1,53 @@
+####################
+# 1 - Install EDDL #
+####################
+
+###########################################
+# 2 - Install OpenCV (dependency of ECVL) #
+###########################################
+
+# 2.1 - Download the source code
+wget -O opencv.zip https://github.com/opencv/opencv/archive/master.zip
+unzip opencv.zip
+mv opencv-master opencv
+pushd opencv > /dev/null
+
+# 2.2 - Configure build
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX ..  # Set install path to conda environment
+
+# 2.3 - Compile and install
+make -j$(nproc)  # Use all available cores
+make install  # We don't need sudo to install in the conda environment
+
+export OPENCV_BUILD_PATH=$(pwd) # Store the build directory path for ECVL configuration
+
+popd > /dev/null  # Exit from build
+popd > /dev/null  # Exit from opencv
+
+####################
+# 3 - Install ECVL #
+####################
+
+# 3.1 - Download the source code
+git clone https://github.com/deephealthproject/ecvl.git
+pushd ecvl > /dev/null
+
+# 3.2 - Configure build
+mkdir build
+pushd build > /dev/null
+cmake \
+  -DECVL_BUILD_EDDL=ON \
+  -DECVL_DATASET=ON \
+  -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
+  -DOpenCV_DIR=$OPENCV_BUILD_PATH \
+  -Deddl_DIR=$CONDA_PREFIX/lib/cmake/eddl \
+  ..
+
+# 3.3 - Compile and install
+cmake --build . --config Release --parallel $(nproc)  # Use all available cores
+cmake --build . --config Release --target install
+
+popd > /dev/null  # Exit from build
+popd > /dev/null  # Exit from ecvl

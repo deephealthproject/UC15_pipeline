@@ -1,0 +1,3 @@
+[submodule "eddl_pipeline/src/third_party/cxxopts"]
+	path = eddl_pipeline/src/third_party/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
