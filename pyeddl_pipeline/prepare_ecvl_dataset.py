@@ -314,11 +314,11 @@ def main(args):
 
         if not args.avoid_preproc:
             # This path must be relative to the folder of the output YAML
-            new_img_path = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
+            new_img_relpath = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
 
             # Add the image to the preprocessing queue with the input and output
             # paths for the preprocessing function
-            new_img_path = os.path.join(args.sub_path, new_img_path)
+            new_img_path = os.path.join(args.sub_path, new_img_relpath)
 
             # Add the image to the preprocessing queue
             if not os.path.isfile(new_img_path) or args.new_preproc:
@@ -329,7 +329,7 @@ def main(args):
                                              new_img_path,
                                              *extra_args))
         else:
-            new_img_path = row['filepath']  # Use the original image
+            new_img_relpath = row['filepath']  # Use the original image
 
         # Get subject data (age, gender...)
         sub_data = subjects_df[subjects_df["participant"] == sub_id]
@@ -340,7 +340,7 @@ def main(args):
         # Add the a row to the main DataFrame with the collected data
         new_row = {'subject': sub_id,
                    'session': sess_id,
-                   'filepath': new_img_path,
+                   'filepath': new_img_relpath,
                    'labels': row_labels,
                    'gender': sub_gender,
                    'age': sub_age}
@@ -577,8 +577,8 @@ def main(args):
 
                 # Add the fixed number of copies for each sample
                 for idx, row in samples_to_copy.iterrows():
+                    orig_path = row["filepath"]
                     for copy_idx in range(n_copies):
-                        orig_path = row["filepath"]
                         if not args.avoid_preproc:
                             # Create the filepath of the new copy
                             # Note: This path is relative to the YAML file
