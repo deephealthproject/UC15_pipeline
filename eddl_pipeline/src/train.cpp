@@ -6,7 +6,7 @@
 #include <ecvl/support_eddl.h>
 #include <eddl/tensor/tensor.h>
 
-#include "training/augmentations.hpp"
+#include "pipeline/augmentations.hpp"
 #include "utils/utils.hpp"
 
 int main(int argc, char **argv) {

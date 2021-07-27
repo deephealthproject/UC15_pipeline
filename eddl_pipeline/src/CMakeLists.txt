@@ -9,7 +9,7 @@ include_directories(third_party/cxxopts/include) # To handle the arguments
 # Aditional sources to include
 # ##############################################################################
 add_subdirectory(utils)
-add_subdirectory(training)
+add_subdirectory(pipeline)
 
 # ##############################################################################
 # Executables
