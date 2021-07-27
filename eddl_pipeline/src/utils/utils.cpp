@@ -8,8 +8,10 @@ Arguments parse_arguments(int argc, char **argv) {
   // Declare the program arguments
   options.add_options()
     ("y,yaml_path", "Path to the ECVL Dataset YAML file", cxxopts::value<std::string>()->default_value("../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19.yaml"))
+    ("t,target_shape", "Height and Width to resize the images", cxxopts::value<std::vector<int>>()->default_value("256,256"))
     ("e,epochs", "Number of training epochs", cxxopts::value<int>()->default_value("10"))
     ("b,batch_size", "Number of samples per minibatch", cxxopts::value<int>()->default_value("32"))
+    ("a,augmentations", "Version of data augmentations to use", cxxopts::value<std::string>()->default_value("0.0"))
     ("m,model", "Name of the model to train", cxxopts::value<std::string>()->default_value("model_1"))
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
     ("l,learning_rate", "Value of the learning rate", cxxopts::value<float>()->default_value("0.0001"))
@@ -26,8 +28,10 @@ Arguments parse_arguments(int argc, char **argv) {
   }
 
   return Arguments(result["yaml_path"].as<std::string>(),
+                   result["target_shape"].as<std::vector<int>>(),
                    result["epochs"].as<int>(),
                    result["batch_size"].as<int>(),
+                   result["augmentations"].as<std::string>(),
                    result["model"].as<std::string>(),
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
