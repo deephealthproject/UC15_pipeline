@@ -10,6 +10,7 @@ include_directories(third_party/cxxopts/include) # To handle the arguments
 # ##############################################################################
 add_subdirectory(utils)
 add_subdirectory(pipeline)
+add_subdirectory(models)
 
 # ##############################################################################
 # Executables
@@ -26,4 +27,6 @@ target_link_libraries(
   ECVL_EDDL
   DATASET
   utils
-  augmentations)
+  augmentations
+  training
+  models)
