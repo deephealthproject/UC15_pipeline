@@ -35,4 +35,6 @@ struct Arguments {
 
 Arguments parse_arguments(int argc, char **argv);
 
+std::string get_current_time_str(const std::string time_format = "%d-%b_%H:%M");
+
 #endif

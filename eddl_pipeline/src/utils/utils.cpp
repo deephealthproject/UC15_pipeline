@@ -1,5 +1,8 @@
 #include "utils.hpp"
+#include <iomanip>
 #include <iostream>
+#include <ctime>
+#include <sstream>
 
 Arguments parse_arguments(int argc, char **argv) {
   cxxopts::Options options(argv[0], "BIMCV COVID 19+ classification training");
@@ -44,4 +47,15 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
                    result["seed"].as<int>());
+}
+
+std::string get_current_time_str(const std::string time_format) {
+  // Get the time
+  auto t = std::time(nullptr);
+  auto tm = *std::localtime(&t);
+
+  // Build the string
+  std::ostringstream oss;
+  oss << std::put_time(&tm, time_format.c_str());
+  return oss.str();
 }
