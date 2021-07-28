@@ -55,29 +55,31 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
     eddl::reset_loss(model);
 
     // Training phase
+    float load_time = 0.f;
+    float train_time = 0.f;
     auto epoch_tr_start = std::chrono::high_resolution_clock::now();
     std::cout << "\nEpoch " << e << " - training:\n";
     dataset.SetSplit(ecvl::SplitType::training);
-    for (int b = 0; b < n_tr_batches; ++b) {
+    for (int b = 1; b <= n_tr_batches; ++b) {
       // Load data
       auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
       auto load_end = std::chrono::high_resolution_clock::now();
-      float load_time = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
+      load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
       // Perform training
       auto train_start = std::chrono::high_resolution_clock::now();
       eddl::train_batch(model, {x}, {y});
       auto train_end = std::chrono::high_resolution_clock::now();
-      float train_time = std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
+      train_time += std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
 
       // Show current loss and metrics
       std::cout << " Batch ";
-      eddl::print_loss(model, b); // Show current loss and metrics
+      eddl::print_loss(model, b-1); // Show current loss and metrics
       std::cout << "- Timers[";
       std::cout << std::fixed << std::setprecision(4);
-      std::cout << "load_batch=" << load_time  * 1e-6 << "s";
-      std::cout << " train_batch=" << train_time * 1e-6 << "s]";
+      std::cout << "avg_load_batch=" << (load_time / b)  * 1e-6 << "s";
+      std::cout << " avg_train_batch=" << (train_time / b) * 1e-6 << "s]";
       std::cout << std::endl;
     }
     auto epoch_tr_end = std::chrono::high_resolution_clock::now();
@@ -88,29 +90,31 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
     eddl::reset_loss(model);
 
     // Validation phase
+    load_time = 0.f;
+    float eval_time = 0.f;
     auto epoch_val_start = std::chrono::high_resolution_clock::now();
     std::cout << "\nEpoch " << e << " - validation:\n";
     dataset.SetSplit(ecvl::SplitType::validation);
-    for (int b = 0; b < n_val_batches; ++b) {
+    for (int b = 1; b <= n_val_batches; ++b) {
       // Load data
       auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
       auto load_end = std::chrono::high_resolution_clock::now();
-      float load_time = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
+      load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
       // Perform evaluation
       auto eval_start = std::chrono::high_resolution_clock::now();
       eddl::eval_batch(model, {x}, {y});
       auto eval_end = std::chrono::high_resolution_clock::now();
-      float train_time = std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
+      eval_time += std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
       // Show current loss and metrics
       std::cout << " Batch ";
-      eddl::print_loss(model, b);
+      eddl::print_loss(model, b-1);
       std::cout << "- Timers[";
       std::cout << std::fixed << std::setprecision(4);
-      std::cout << "load_batch=" << load_time * 1e-6 << "s";
-      std::cout << " train_batch=" << train_time * 1e-6 << "s]";
+      std::cout << "load_batch=" << (load_time / b) * 1e-6 << "s";
+      std::cout << " eval_batch=" << (eval_time / b) * 1e-6 << "s]";
       std::cout << std::endl;
     }
     auto epoch_val_end = std::chrono::high_resolution_clock::now();

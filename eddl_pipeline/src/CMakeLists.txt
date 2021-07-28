@@ -29,4 +29,5 @@ target_link_libraries(
   utils
   augmentations
   training
+  test
   models)

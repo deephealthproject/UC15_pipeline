@@ -9,6 +9,7 @@
 #include "models/models.hpp"
 #include "pipeline/augmentations.hpp"
 #include "pipeline/training.hpp"
+#include "pipeline/test.hpp"
 #include "utils/utils.hpp"
 
 int main(int argc, char **argv) {
@@ -35,6 +36,8 @@ int main(int argc, char **argv) {
               true); // TODO Configurable opt, cs and initialization
 
   TrainResults tr_res = train(dataset, model, args);
+
+  TestResults te_res = test(dataset, model, args);
 
   return EXIT_SUCCESS;
 }
