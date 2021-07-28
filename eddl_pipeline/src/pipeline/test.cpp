@@ -39,7 +39,7 @@ TestResults test(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
 
     // Show current loss and metrics
     std::cout << " Batch ";
-    eddl::print_loss(model, b-1);
+    eddl::print_loss(model, b);
     std::cout << "- Timers[";
     std::cout << std::fixed << std::setprecision(4);
     std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";

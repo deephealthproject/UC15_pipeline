@@ -27,13 +27,15 @@ int main(int argc, char **argv) {
                    args.target_shape[1]};
   Net *model = get_model(args.model, in_shape, dataset.classes_.size());
 
+  Optimizer *opt = get_optimizer(args.optimizer, args.learning_rate);
+
   // Compile the model
   eddl::build(model,
-              eddl::adam(),
+              opt,
               {"softmax_cross_entropy"},
               {"accuracy"},
               eddl::CS_GPU({1}),
-              true); // TODO Configurable opt, cs and initialization
+              true); // TODO Configurable cs and initialization
 
   TrainResults tr_res = train(dataset, model, args);
 

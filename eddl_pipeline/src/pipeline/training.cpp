@@ -75,7 +75,7 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
 
       // Show current loss and metrics
       std::cout << " Batch ";
-      eddl::print_loss(model, b-1); // Show current loss and metrics
+      eddl::print_loss(model, b); // Show current loss and metrics
       std::cout << "- Timers[";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "avg_load_batch=" << (load_time / b)  * 1e-6 << "s";
@@ -110,7 +110,7 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
 
       // Show current loss and metrics
       std::cout << " Batch ";
-      eddl::print_loss(model, b-1);
+      eddl::print_loss(model, b);
       std::cout << "- Timers[";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "load_batch=" << (load_time / b) * 1e-6 << "s";
@@ -127,4 +127,16 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
   delete y;
 
   return TrainResults({}, {}, {}, {}, "", "");
+}
+
+Optimizer *get_optimizer(const std::string &opt_name, const float learning_rate) {
+  if (opt_name == "Adam")
+      return eddl::adam(learning_rate);
+  if (opt_name == "SGD")
+      return eddl::sgd(learning_rate, 0.9);
+
+  std::cout << "The optimizer name provided (\"" << opt_name
+            << "\") is not valid!\n";
+  std::cout << "The valid optimizers are: Adam SGD\n";
+  exit(EXIT_FAILURE);
 }

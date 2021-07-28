@@ -26,4 +26,6 @@ struct TrainResults {
 };
 
 TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args);
+
+Optimizer *get_optimizer(const std::string &opt_name, const float learning_rate);
 #endif
