@@ -11,6 +11,10 @@ Arguments parse_arguments(int argc, char **argv) {
     ("t,target_shape", "Height and Width to resize the images", cxxopts::value<std::vector<int>>()->default_value("256,256"))
     ("e,epochs", "Number of training epochs", cxxopts::value<int>()->default_value("10"))
     ("b,batch_size", "Number of samples per minibatch", cxxopts::value<int>()->default_value("32"))
+    ("g,gpus", "GPUs to use. Selected with a bit mask: \"1,1\" for two gpus", cxxopts::value<std::vector<int>>()->default_value("1"))
+    ("lsb", "Number of batches to process between GPUs synchronizations", cxxopts::value<int>()->default_value("1"))
+    ("c,cpu", "Use computing service CPU", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+    ("mem_level", "Amount of memory to use: low_mem, mid_mem, full_mem", cxxopts::value<std::string>()->default_value("full_mem"))
     ("a,augmentations", "Version of data augmentations to use", cxxopts::value<std::string>()->default_value("0.0"))
     ("m,model", "Name of the model to train", cxxopts::value<std::string>()->default_value("model_1"))
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
@@ -31,6 +35,10 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["target_shape"].as<std::vector<int>>(),
                    result["epochs"].as<int>(),
                    result["batch_size"].as<int>(),
+                   result["gpus"].as<std::vector<int>>(),
+                   result["lsb"].as<int>(),
+                   result["cpu"].as<bool>(),
+                   result["mem_level"].as<std::string>(),
                    result["augmentations"].as<std::string>(),
                    result["model"].as<std::string>(),
                    result["optimizer"].as<std::string>(),

@@ -10,6 +10,10 @@ struct Arguments {
   std::vector<int> target_shape;
   int epochs;
   int batch_size;
+  std::vector<int> gpus;
+  int lsb;
+  bool cpu;
+  std::string mem_level;
   std::string augmentations;
   std::string model;
   std::string optimizer;
@@ -19,11 +23,13 @@ struct Arguments {
   Arguments() = delete;
   Arguments(std::string yaml_path, const std::vector<int> &target_shape,
             const int epochs, const int batch_size,
-            const std::string augmentations, const std::string model,
-            const std::string optimizer, const float learning_rate,
-            const int seed)
+            const std::vector<int> &gpus, const int lsb, const bool cpu,
+            const std::string mem_level, const std::string augmentations,
+            const std::string model, const std::string optimizer,
+            const float learning_rate, const int seed)
       : yaml_path(yaml_path), target_shape(target_shape), epochs(epochs),
-        batch_size(batch_size), augmentations(augmentations), model(model),
+        batch_size(batch_size), gpus(gpus), lsb(lsb), cpu(cpu),
+        mem_level(mem_level), augmentations(augmentations), model(model),
         optimizer(optimizer), learning_rate(learning_rate), seed(seed) {}
 };
 

@@ -29,13 +29,18 @@ int main(int argc, char **argv) {
 
   Optimizer *opt = get_optimizer(args.optimizer, args.learning_rate);
 
+  CompServ *cs;
+  if (args.cpu)
+    cs = eddl::CS_CPU(-1, "full_mem");
+  else
+    cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
+
   // Compile the model
   eddl::build(model,
               opt,
               {"softmax_cross_entropy"},
               {"accuracy"},
-              eddl::CS_GPU({1}),
-              true); // TODO Configurable cs and initialization
+              cs);
 
   TrainResults tr_res = train(dataset, model, args);
 
