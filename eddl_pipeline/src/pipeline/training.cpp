@@ -73,13 +73,17 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
       auto train_end = std::chrono::high_resolution_clock::now();
       train_time += std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
 
-      // Show current loss and metrics
-      std::cout << " Batch ";
-      eddl::print_loss(model, b); // Show current loss and metrics
-      std::cout << "- Timers[";
+      // Get the current losses and metrics
+      float curr_loss = eddl::get_losses(model)[0];
+      float curr_acc = eddl::get_metrics(model)[0];
+
+      // Show current stats
+      std::cout << " Batch " << b << "/" << n_tr_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
+      std::cout << "Metrics[ loss=" << curr_loss << ", acc=" << curr_acc << " ]";
+      std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b)  * 1e-6 << "s";
-      std::cout << " avg_train_batch=" << (train_time / b) * 1e-6 << "s]";
+      std::cout << ", avg_train_batch=" << (train_time / b) * 1e-6 << "s ]";
       std::cout << std::endl;
     }
     auto epoch_tr_end = std::chrono::high_resolution_clock::now();
@@ -108,13 +112,17 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
       auto eval_end = std::chrono::high_resolution_clock::now();
       eval_time += std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
-      // Show current loss and metrics
-      std::cout << " Batch ";
-      eddl::print_loss(model, b);
-      std::cout << "- Timers[";
+      // Get the current losses and metrics
+      float curr_loss = eddl::get_losses(model)[0];
+      float curr_acc = eddl::get_metrics(model)[0];
+
+      // Show current stats
+      std::cout << " Batch " << b << "/" << n_val_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
-      std::cout << "load_batch=" << (load_time / b) * 1e-6 << "s";
-      std::cout << " eval_batch=" << (eval_time / b) * 1e-6 << "s]";
+      std::cout << "Metrics[ loss=" << curr_loss << ", acc=" << curr_acc << " ]";
+      std::cout << " - Timers[ ";
+      std::cout << "avg_load_batch=" << (load_time / b)  * 1e-6 << "s";
+      std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
       std::cout << std::endl;
     }
     auto epoch_val_end = std::chrono::high_resolution_clock::now();
