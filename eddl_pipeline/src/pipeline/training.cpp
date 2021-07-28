@@ -1,4 +1,5 @@
 #include "training.hpp"
+#include <chrono>
 
 TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
   // Get train split info
@@ -44,44 +45,77 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
   // Auxiliary tensors to load the batches
   Tensor *x = new Tensor({args.batch_size, dataset.n_channels_,
                           args.target_shape[0], args.target_shape[1]});
-  Tensor *y =
-      new Tensor({args.batch_size, static_cast<int>(dataset.classes_.size())});
+  Tensor *y = new Tensor({args.batch_size, static_cast<int>(dataset.classes_.size())});
 
-  for (int e = 0; e < args.epochs; ++e) {
+  for (int e = 1; e <= args.epochs; ++e) {
     // Reset batch counter and shuffle all the data splits
     dataset.ResetAllBatches(true);
 
     // Reset the accumulated loss value
     eddl::reset_loss(model);
 
-    std::cout << "Epoch " << e << ":\n";
     // Training phase
+    auto epoch_tr_start = std::chrono::high_resolution_clock::now();
+    std::cout << "\nEpoch " << e << " - training:\n";
     dataset.SetSplit(ecvl::SplitType::training);
     for (int b = 0; b < n_tr_batches; ++b) {
+      // Load data
+      auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
+      auto load_end = std::chrono::high_resolution_clock::now();
+      float load_time = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
+      // Perform training
+      auto train_start = std::chrono::high_resolution_clock::now();
       eddl::train_batch(model, {x}, {y});
+      auto train_end = std::chrono::high_resolution_clock::now();
+      float train_time = std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
 
-      std::cout << "Batch ";
+      // Show current loss and metrics
+      std::cout << " Batch ";
       eddl::print_loss(model, b); // Show current loss and metrics
+      std::cout << "- Timers[";
+      std::cout << std::fixed << std::setprecision(4);
+      std::cout << "load_batch=" << load_time  * 1e-6 << "s";
+      std::cout << " train_batch=" << train_time * 1e-6 << "s]";
       std::cout << std::endl;
     }
+    auto epoch_tr_end = std::chrono::high_resolution_clock::now();
+    float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
+    std::cout << "Epoch " << e << " - training time elapsed = " << epoch_tr_time * 1e-6 << "s\n";
 
     // Reset the accumulated loss value
     eddl::reset_loss(model);
 
     // Validation phase
-    std::cout << "Validation:\n";
+    auto epoch_val_start = std::chrono::high_resolution_clock::now();
+    std::cout << "\nEpoch " << e << " - validation:\n";
     dataset.SetSplit(ecvl::SplitType::validation);
     for (int b = 0; b < n_val_batches; ++b) {
+      // Load data
+      auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
+      auto load_end = std::chrono::high_resolution_clock::now();
+      float load_time = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
+      // Perform evaluation
+      auto eval_start = std::chrono::high_resolution_clock::now();
       eddl::eval_batch(model, {x}, {y});
+      auto eval_end = std::chrono::high_resolution_clock::now();
+      float train_time = std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
-      std::cout << "Batch ";
-      eddl::print_loss(model, b); // Show current loss and metrics
+      // Show current loss and metrics
+      std::cout << " Batch ";
+      eddl::print_loss(model, b);
+      std::cout << "- Timers[";
+      std::cout << std::fixed << std::setprecision(4);
+      std::cout << "load_batch=" << load_time * 1e-6 << "s";
+      std::cout << " train_batch=" << train_time * 1e-6 << "s]";
       std::cout << std::endl;
     }
+    auto epoch_val_end = std::chrono::high_resolution_clock::now();
+    float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
+    std::cout << "Epoch " << e << " - validation time elapsed = " << epoch_val_time * 1e-6 << "s\n";
   }
 
   // Free batch memory
