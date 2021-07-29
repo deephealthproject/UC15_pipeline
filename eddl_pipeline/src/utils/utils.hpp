@@ -17,6 +17,7 @@ struct Arguments {
   std::string mem_level; // Memory profile to use
   std::string augmentations; // DA version tag to use
   std::string model;         // Name of the topology to use
+  std::string ckpt;          // ONNX file to use as checkpoint to start training
   std::string optimizer;     // Name of the training optimizer to use
   float learning_rate;       // Learning rate of the optimizer
   int seed;                  // Seed for the random computations
@@ -27,18 +28,18 @@ struct Arguments {
             const int epochs, const int batch_size,
             const std::vector<int> &gpus, const int lsb, const bool cpu,
             const std::string mem_level, const std::string augmentations,
-            const std::string model, const std::string optimizer,
-            const float learning_rate, const int seed,
-            const std::string exp_path)
+            const std::string model, const std::string ckpt,
+            const std::string optimizer, const float learning_rate,
+            const int seed, const std::string exp_path)
       : yaml_path(yaml_path), target_shape(target_shape), epochs(epochs),
         batch_size(batch_size), gpus(gpus), lsb(lsb), cpu(cpu),
         mem_level(mem_level), augmentations(augmentations), model(model),
-        optimizer(optimizer), learning_rate(learning_rate), seed(seed),
-        exp_path(exp_path) {}
+        ckpt(ckpt), optimizer(optimizer), learning_rate(learning_rate),
+        seed(seed), exp_path(exp_path) {}
 };
 
 // Writes the str representation of the Arguments class in json format
-std::ostream& operator<<(std::ostream &out, Arguments args);
+std::ostream &operator<<(std::ostream &out, Arguments args);
 
 Arguments parse_arguments(int argc, char **argv);
 

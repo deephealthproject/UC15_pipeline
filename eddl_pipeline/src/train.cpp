@@ -35,11 +35,21 @@ int main(int argc, char **argv) {
   // Show basic dataset info
   dataset_summary(dataset, args);
 
-  // Create the model topology selected
-  std::cout << "\nGoing to prepare the model \"" << args.model << "\"\n";
-  auto in_shape = {dataset.n_channels_, args.target_shape[0], args.target_shape[1]};
-  Net *model = get_model(args.model, in_shape, dataset.classes_.size());
-  std::cout << "Model created!\n";
+  Net *model;
+  bool init_weights = true;
+  if (args.ckpt.empty()) {
+    // Create the model topology selected
+    std::cout << "\nGoing to prepare the model \"" << args.model << "\"\n";
+    auto in_shape = {dataset.n_channels_, args.target_shape[0], args.target_shape[1]};
+    model = get_model(args.model, in_shape, dataset.classes_.size());
+    std::cout << "Model created!\n";
+  } else {
+    // Load the ONNX model as checkpoint
+    std::cout << "\nGoing to load the model from \"" << args.ckpt << "\"\n";
+    model = import_net_from_onnx_file(args.ckpt);
+    init_weights = false; // Avoid to override the imported weights
+    std::cout << "Model loaded!\n";
+  }
 
   Optimizer *opt = get_optimizer(args.optimizer, args.learning_rate);
 
@@ -49,7 +59,7 @@ int main(int argc, char **argv) {
   else
     cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
 
-  eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs);
+  eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
   std::cout << "Model built!\n";
 
   std::cout << "\n";

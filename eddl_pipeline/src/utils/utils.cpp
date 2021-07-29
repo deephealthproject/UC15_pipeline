@@ -38,6 +38,7 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_str_attr("mem_level", args.mem_level); out << ",\n";
   print_str_attr("augmentations", args.augmentations); out << ",\n";
   print_str_attr("model", args.model); out << ",\n";
+  print_str_attr("ckpt", args.ckpt); out << ",\n";
   print_str_attr("optimizer", args.optimizer); out << ",\n";
   print_num_attr("learning_rate", args.learning_rate); out << ",\n";
   print_num_attr("seed", args.seed); out << ",\n";
@@ -62,6 +63,7 @@ Arguments parse_arguments(int argc, char **argv) {
     ("mem_level", "Amount of memory to use: low_mem, mid_mem, full_mem", cxxopts::value<std::string>()->default_value("full_mem"))
     ("a,augmentations", "Version of data augmentations to use", cxxopts::value<std::string>()->default_value("0.0"))
     ("m,model", "Name of the model to train", cxxopts::value<std::string>()->default_value("model_1"))
+    ("ckpt", "Path to an ONNX file to use as starting point for training", cxxopts::value<std::string>()->default_value(""))
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
     ("l,learning_rate", "Value of the learning rate", cxxopts::value<float>()->default_value("0.0001"))
     ("s,seed", "Seed value for random computations", cxxopts::value<int>()->default_value("27"))
@@ -87,6 +89,7 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["mem_level"].as<std::string>(),
                    result["augmentations"].as<std::string>(),
                    result["model"].as<std::string>(),
+                   result["ckpt"].as<std::string>(),
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
                    result["seed"].as<int>(),
