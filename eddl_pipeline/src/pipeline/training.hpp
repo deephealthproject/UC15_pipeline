@@ -25,6 +25,8 @@ struct TrainResults {
         best_model_by_acc(best_model_by_acc) {}
 };
 
+void dataset_summary(ecvl::DLDataset &dataset, const Arguments &args);
+
 TrainResults train(ecvl::DLDataset &dataset, Net *model,
                    const std::string &exp_name, Arguments &args);
 
