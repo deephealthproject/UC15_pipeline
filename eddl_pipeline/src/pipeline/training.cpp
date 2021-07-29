@@ -6,18 +6,18 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
                    const std::string &exp_name, Arguments &args) {
   // Get train split info
   dataset.SetSplit(ecvl::SplitType::training);
-  int n_tr_samples = dataset.GetSplit().size();
-  int n_tr_batches = n_tr_samples / args.batch_size;
+  const int n_tr_samples = dataset.GetSplit().size();
+  const int n_tr_batches = n_tr_samples / args.batch_size;
 
   // Get validation split info
   dataset.SetSplit(ecvl::SplitType::validation);
-  int n_val_samples = dataset.GetSplit().size();
-  int n_val_batches = n_val_samples / args.batch_size;
+  const int n_val_samples = dataset.GetSplit().size();
+  const int n_val_batches = n_val_samples / args.batch_size;
 
   // Get test split info
   dataset.SetSplit(ecvl::SplitType::test);
-  int n_te_samples = dataset.GetSplit().size();
-  int n_te_batches = n_te_samples / args.batch_size;
+  const int n_te_samples = dataset.GetSplit().size();
+  const int n_te_batches = n_te_samples / args.batch_size;
 
   std::cout << "###################\n";
   std::cout << "# Dataset summary #\n";
@@ -54,7 +54,7 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
   exp_path /= exp_name; // Append the exp_name to the experiments path
   std::filesystem::create_directories(exp_path);
   // Prepare the checkpoints folder inside the experiment folder
-  std::filesystem::path ckpts_path = exp_path / "ckpts";
+  const std::filesystem::path ckpts_path = exp_path / "ckpts";
   std::filesystem::create_directory(ckpts_path);
 
   // Auxiliary tensors to load the batches
@@ -77,20 +77,20 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
     dataset.SetSplit(ecvl::SplitType::training);
     for (int b = 1; b <= n_tr_batches; ++b) {
       // Load data
-      auto load_start = std::chrono::high_resolution_clock::now();
+      const auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
-      auto load_end = std::chrono::high_resolution_clock::now();
+      const auto load_end = std::chrono::high_resolution_clock::now();
       load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
       // Perform training
-      auto train_start = std::chrono::high_resolution_clock::now();
+      const auto train_start = std::chrono::high_resolution_clock::now();
       eddl::train_batch(model, {x}, {y});
-      auto train_end = std::chrono::high_resolution_clock::now();
+      const auto train_end = std::chrono::high_resolution_clock::now();
       train_time += std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
 
       // Get the current losses and metrics
-      float curr_loss = eddl::get_losses(model)[0];
-      float curr_acc = eddl::get_metrics(model)[0];
+      const float curr_loss = eddl::get_losses(model)[0];
+      const float curr_acc = eddl::get_metrics(model)[0];
       losses.push_back(curr_loss);
       accs.push_back(curr_acc);
 
@@ -103,8 +103,8 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
       std::cout << ", avg_train_batch=" << (train_time / b) * 1e-6 << "s ]";
       std::cout << std::endl;
     }
-    auto epoch_tr_end = std::chrono::high_resolution_clock::now();
-    float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
+    const auto epoch_tr_end = std::chrono::high_resolution_clock::now();
+    const float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
     std::cout << "Epoch " << e << " - training time elapsed = " << epoch_tr_time * 1e-6 << "s\n";
 
     // Reset the accumulated loss value
@@ -113,25 +113,25 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
     // Validation phase
     load_time = 0.f;
     float eval_time = 0.f;
-    auto epoch_val_start = std::chrono::high_resolution_clock::now();
+    const auto epoch_val_start = std::chrono::high_resolution_clock::now();
     std::cout << "\nEpoch " << e << " - validation:\n";
     dataset.SetSplit(ecvl::SplitType::validation);
     for (int b = 1; b <= n_val_batches; ++b) {
       // Load data
-      auto load_start = std::chrono::high_resolution_clock::now();
+      const auto load_start = std::chrono::high_resolution_clock::now();
       dataset.LoadBatch(x, y);
-      auto load_end = std::chrono::high_resolution_clock::now();
+      const auto load_end = std::chrono::high_resolution_clock::now();
       load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
 
       // Perform evaluation
-      auto eval_start = std::chrono::high_resolution_clock::now();
+      const auto eval_start = std::chrono::high_resolution_clock::now();
       eddl::eval_batch(model, {x}, {y});
-      auto eval_end = std::chrono::high_resolution_clock::now();
+      const auto eval_end = std::chrono::high_resolution_clock::now();
       eval_time += std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
       // Get the current losses and metrics
-      float curr_loss = eddl::get_losses(model)[0];
-      float curr_acc = eddl::get_metrics(model)[0];
+      const float curr_loss = eddl::get_losses(model)[0];
+      const float curr_acc = eddl::get_metrics(model)[0];
       val_losses.push_back(curr_loss);
       val_accs.push_back(curr_acc);
 
@@ -144,13 +144,13 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
       std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
       std::cout << std::endl;
     }
-    auto epoch_val_end = std::chrono::high_resolution_clock::now();
-    float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
+    const auto epoch_val_end = std::chrono::high_resolution_clock::now();
+    const float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
     std::cout << "Epoch " << e << " - validation time elapsed = " << epoch_val_time * 1e-6 << "s\n";
 
     // Get the final metrics from the validation split
-    float val_loss = val_losses.back();
-    float val_acc = val_accs.back();
+    const float val_loss = val_losses.back();
+    const float val_acc = val_accs.back();
     // Check if we have to save the current model as ONNX
     if (val_loss < best_loss || val_acc > best_acc) {
       // Prepare the onnx file name

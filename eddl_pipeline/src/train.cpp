@@ -47,22 +47,22 @@ int main(int argc, char **argv) {
 
   eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs);
 
-  /*
-   * Train phase
-   */
+  std::cout << "###############\n";
+  std::cout << "# Train phase #\n";
+  std::cout << "###############\n";
   TrainResults tr_res = train(dataset, model, exp_name, args);
-  // Free the memory before the test phase
-  delete model;
+  delete model; // Free the memory before the test phase
 
-  /*
-   * Test phase
-   */
+  std::cout << "\n";
+  std::cout << "##############\n";
+  std::cout << "# Test phase #\n";
+  std::cout << "##############\n";
   std::vector<std::string> test_models_paths = {tr_res.best_model_by_loss};
   if (tr_res.best_model_by_loss != tr_res.best_model_by_acc)
     test_models_paths.push_back(tr_res.best_model_by_acc);
 
   for (auto &onnx_path : test_models_paths) {
-    std::cout << "\nGoing to run test with model \"" << onnx_path << "\"\n";
+    std::cout << "\nGoing to run test with model \"" << onnx_path << "\"\n\n";
     // Load the model for testing
     model = import_net_from_onnx_file(onnx_path);
 
@@ -76,8 +76,7 @@ int main(int argc, char **argv) {
 
     TestResults te_res = test(dataset, model, args);
 
-    // Free memory before the next test iteration
-    delete model;
+    delete model; // Free memory before the next test iteration
   }
 
   return EXIT_SUCCESS;
