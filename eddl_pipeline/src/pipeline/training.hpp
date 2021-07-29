@@ -25,7 +25,9 @@ struct TrainResults {
         best_model_by_acc(best_model_by_acc) {}
 };
 
-TrainResults train(ecvl::DLDataset &dataset, Net *model, Arguments &args);
+TrainResults train(ecvl::DLDataset &dataset, Net *model,
+                   const std::string &exp_name, Arguments &args);
 
-Optimizer *get_optimizer(const std::string &opt_name, const float learning_rate);
+Optimizer *get_optimizer(const std::string &opt_name,
+                         const float learning_rate);
 #endif

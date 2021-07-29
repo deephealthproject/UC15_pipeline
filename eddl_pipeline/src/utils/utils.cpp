@@ -23,6 +23,7 @@ Arguments parse_arguments(int argc, char **argv) {
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
     ("l,learning_rate", "Value of the learning rate", cxxopts::value<float>()->default_value("0.0001"))
     ("s,seed", "Seed value for random computations", cxxopts::value<int>()->default_value("27"))
+    ("exp_path", "Path to the folder to store the experiments", cxxopts::value<std::string>()->default_value("experiments"))
     ("h,help", "Print usage");
 
   // Read arguments
@@ -46,7 +47,8 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["model"].as<std::string>(),
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
-                   result["seed"].as<int>());
+                   result["seed"].as<int>(),
+                   result["exp_path"].as<std::string>());
 }
 
 std::string get_current_time_str(const std::string time_format) {

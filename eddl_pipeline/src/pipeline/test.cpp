@@ -18,6 +18,9 @@ TestResults test(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
   // Reset the accumulated loss value
   eddl::reset_loss(model);
 
+  // Auxiliary variables to store the results
+  float loss, acc;
+
   // Validation phase
   float load_time = 0.f;
   float eval_time = 0.f;
@@ -58,5 +61,5 @@ TestResults test(ecvl::DLDataset &dataset, Net *model, Arguments &args) {
   delete x;
   delete y;
 
-  return TestResults({}, {});
+  return TestResults(loss, acc);
 }

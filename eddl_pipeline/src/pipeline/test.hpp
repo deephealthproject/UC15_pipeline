@@ -10,11 +10,10 @@
 #include "../utils/utils.hpp"
 
 struct TestResults {
-  std::vector<float> loss;
-  std::vector<float> acc;
+  float loss;
+  float acc;
 
-  TestResults(const std::vector<float> loss, std::vector<float> acc)
-      : loss(loss), acc(acc) {}
+  TestResults(const float loss, float acc) : loss(loss), acc(acc) {}
 };
 
 TestResults test(ecvl::DLDataset &dataset, Net *model, Arguments &args);
