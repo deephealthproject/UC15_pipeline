@@ -2,6 +2,7 @@
 #define _UTILS_HPP_
 
 #include <cxxopts.hpp>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,9 @@ struct Arguments {
         optimizer(optimizer), learning_rate(learning_rate), seed(seed),
         exp_path(exp_path) {}
 };
+
+// Writes the str representation of the Arguments class in json format
+std::ostream& operator<<(std::ostream &out, Arguments args);
 
 Arguments parse_arguments(int argc, char **argv);
 

@@ -70,6 +70,11 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
   const std::filesystem::path ckpts_path = exp_path / "ckpts";
   std::filesystem::create_directory(ckpts_path);
 
+  // Store the full experiment configuration in a json file
+  std::ofstream json_args((exp_path / "args.json").string());
+  json_args << args;
+  json_args.close();
+
   // Auxiliary tensors to load the batches
   Tensor *x = new Tensor({args.batch_size, dataset.n_channels_,
                           args.target_shape[0], args.target_shape[1]});

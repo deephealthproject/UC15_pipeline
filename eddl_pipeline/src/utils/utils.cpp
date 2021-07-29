@@ -4,6 +4,48 @@
 #include <ctime>
 #include <sstream>
 
+std::ostream& operator<<(std::ostream &out, Arguments args) {
+  // Auxiliary lambda to print string attributes
+  auto print_str_attr = [&out](const std::string &k, const std::string &v) {
+    out << "    \"" << k << "\": \"" << v << "\"";
+  };
+  // Auxiliary lambda to print numeric attributes
+  auto print_num_attr = [&out](const std::string &k, const auto &v) {
+    out << "    \"" << k << "\": " << std::to_string(v);
+  };
+  // Auxiliary lambda to print vector<int> attributes
+  auto print_vec_attr = [&out](const std::string &k, const std::vector<int> &v) {
+    out << "    \"" << k << "\": [";
+    for (int i = 0; i < v.size(); ++i) {
+      out << "\n        "; // 8 spaces for double tabulation
+      out << std::to_string(v[i]);
+      if (i != v.size() - 1)
+        out << ",";
+      else
+       out << "\n";
+    }
+    out << "    ]";
+  };
+  // Print the Arguments info in json format
+  out << "{\n";
+  print_str_attr("yaml_path", args.yaml_path); out << ",\n";
+  print_vec_attr("target_shape", args.target_shape); out << ",\n";
+  print_num_attr("epochs", args.epochs); out << ",\n";
+  print_num_attr("batch_size", args.batch_size); out << ",\n";
+  print_vec_attr("gpus", args.gpus); out << ",\n";
+  print_num_attr("lsb", args.lsb); out << ",\n";
+  print_num_attr("cpu", args.cpu); out << ",\n";
+  print_str_attr("mem_level", args.mem_level); out << ",\n";
+  print_str_attr("augmentations", args.augmentations); out << ",\n";
+  print_str_attr("model", args.model); out << ",\n";
+  print_str_attr("optimizer", args.optimizer); out << ",\n";
+  print_num_attr("learning_rate", args.learning_rate); out << ",\n";
+  print_num_attr("seed", args.seed); out << ",\n";
+  print_str_attr("exp_path", args.exp_path); out << "\n"; // Dont put "," in the last attr
+  out << "}";
+  return out;
+}
+
 Arguments parse_arguments(int argc, char **argv) {
   cxxopts::Options options(argv[0], "BIMCV COVID 19+ classification training");
   // Change the maximum number of columns of the parser output messages (the help message)
