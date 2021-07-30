@@ -101,7 +101,6 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
     float load_time = 0.f;
     float train_time = 0.f;
     auto epoch_tr_start = std::chrono::high_resolution_clock::now();
-    std::cout << "\nEpoch " << e << " - training:\n";
     dataset.SetSplit(ecvl::SplitType::training);
     for (int b = 1; b <= n_tr_batches; ++b) {
       // Load data
@@ -123,18 +122,18 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
       accs.push_back(curr_acc);
 
       // Show current stats
-      std::cout << "\r";
+      std::cout << "Training: Epoch " << e << "/" << args.epochs << " - ";
       std::cout << "Batch " << b << "/" << n_tr_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "Metrics[ loss=" << curr_loss << ", acc=" << curr_acc << " ]";
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_train_batch=" << (train_time / b) * 1e-6 << "s ]";
-      std::cout << std::flush;
+      std::cout << std::endl;
     }
     const auto epoch_tr_end = std::chrono::high_resolution_clock::now();
     const float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
-    std::cout << "\nEpoch " << e << " - training time elapsed = " << epoch_tr_time * 1e-6 << "s\n";
+    std::cout << "Epoch " << e << "/" << args.epochs << ": training time elapsed = " << epoch_tr_time * 1e-6 << "s\n\n";
 
     // Reset the accumulated loss value
     eddl::reset_loss(model);
@@ -143,7 +142,6 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
     load_time = 0.f;
     float eval_time = 0.f;
     const auto epoch_val_start = std::chrono::high_resolution_clock::now();
-    std::cout << "\nEpoch " << e << " - validation:\n";
     dataset.SetSplit(ecvl::SplitType::validation);
     for (int b = 1; b <= n_val_batches; ++b) {
       // Load data
@@ -165,18 +163,18 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
       val_accs.push_back(curr_acc);
 
       // Show current stats
-      std::cout << "\r";
+      std::cout << "Validation: Epoch " << e << "/" << args.epochs << " - ";
       std::cout << "Batch " << b << "/" << n_val_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "Metrics[ val_loss=" << curr_loss << ", val_acc=" << curr_acc << " ]";
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
-      std::cout << std::flush;
+      std::cout << std::endl;
     }
     const auto epoch_val_end = std::chrono::high_resolution_clock::now();
     const float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
-    std::cout << "\nEpoch " << e << " - validation time elapsed = " << epoch_val_time * 1e-6 << "s\n";
+    std::cout << "Epoch " << e << "/" << args.epochs << ": validation time elapsed = " << epoch_val_time * 1e-6 << "s\n\n";
 
     // Get the final metrics from the validation split
     const float val_loss = val_losses.back();
@@ -197,14 +195,14 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
         onnx_name += "_by-acc.onnx";
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byacc = onnx_fname;
-        std::cout << "\nNew best model by acc: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by acc: \"" << onnx_fname << "\"\n";
       } else if (val_acc <= best_acc) { // Only improves loss
         best_loss = val_loss;
 
         onnx_name += "_by-loss.onnx";
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byloss = onnx_fname;
-        std::cout << "\nNew best model by loss: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by loss: \"" << onnx_fname << "\"\n";
       } else { // Improves loss and acc
         best_acc = val_acc;
         best_loss = val_loss;
@@ -213,7 +211,7 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byloss = onnx_fname;
         best_model_byacc = onnx_fname;
-        std::cout << "\nNew best model by loss and acc: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by loss and acc: \"" << onnx_fname << "\"\n\n";
       }
 
       save_net_to_onnx_file(model, onnx_fname);
@@ -278,7 +276,6 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     float load_time = 0.f;
     float train_time = 0.f;
     auto epoch_tr_start = std::chrono::high_resolution_clock::now();
-    std::cout << "\nEpoch " << e << " - training:\n";
     dataset.SetSplit(ecvl::SplitType::training);
     tr_datagen.Start();
     for (int b = 1; tr_datagen.HasNext(); ++b) {
@@ -306,14 +303,15 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       accs.push_back(curr_acc);
 
       // Show current stats
-      std::cout << "\r";
+      std::cout << "Training: Epoch " << e << "/" << args.epochs << " - ";
       std::cout << "Batch " << b << "/" << n_tr_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "Metrics[ loss=" << curr_loss << ", acc=" << curr_acc << " ]";
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_train_batch=" << (train_time / b) * 1e-6 << "s ]";
-      std::cout << std::flush;
+      std::cout << " - DataGenerator[ loaded_batches = " << tr_datagen.Size() << " ]";
+      std::cout << std::endl;
 
       // Free memory for the next batch;
       delete x;
@@ -322,7 +320,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     tr_datagen.Stop();
     const auto epoch_tr_end = std::chrono::high_resolution_clock::now();
     const float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
-    std::cout << "\nEpoch " << e << " - training time elapsed = " << epoch_tr_time * 1e-6 << "s\n";
+    std::cout << "Epoch " << e << "/" << args.epochs << ": training time elapsed = " << epoch_tr_time * 1e-6 << "s\n\n";
 
     // Reset the accumulated loss value
     eddl::reset_loss(model);
@@ -331,7 +329,6 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     load_time = 0.f;
     float eval_time = 0.f;
     const auto epoch_val_start = std::chrono::high_resolution_clock::now();
-    std::cout << "\nEpoch " << e << " - validation:\n";
     dataset.SetSplit(ecvl::SplitType::validation);
     val_datagen.Start();
     for (int b = 1; val_datagen.HasNext(); ++b) {
@@ -359,14 +356,15 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       val_accs.push_back(curr_acc);
 
       // Show current stats
-      std::cout << "\r";
+      std::cout << "Validation: Epoch " << e << "/" << args.epochs << " - ";
       std::cout << "Batch " << b << "/" << n_val_batches << ": ";
       std::cout << std::fixed << std::setprecision(4);
       std::cout << "Metrics[ val_loss=" << curr_loss << ", val_acc=" << curr_acc << " ]";
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
-      std::cout << std::flush;
+      std::cout << " - DataGenerator[ loaded_batches = " << val_datagen.Size() << " ]";
+      std::cout << std::endl;
 
       // Free memory for the next batch;
       delete x;
@@ -375,7 +373,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     val_datagen.Stop();
     const auto epoch_val_end = std::chrono::high_resolution_clock::now();
     const float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
-    std::cout << "\nEpoch " << e << " - validation time elapsed = " << epoch_val_time * 1e-6 << "s\n";
+    std::cout << "Epoch " << e << "/" << args.epochs << ": validation time elapsed = " << epoch_val_time * 1e-6 << "s\n\n";
 
     // Get the final metrics from the validation split
     const float val_loss = val_losses.back();
@@ -396,14 +394,14 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
         onnx_name += "_by-acc.onnx";
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byacc = onnx_fname;
-        std::cout << "\nNew best model by acc: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by acc: \"" << onnx_fname << "\"\n";
       } else if (val_acc <= best_acc) { // Only improves loss
         best_loss = val_loss;
 
         onnx_name += "_by-loss.onnx";
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byloss = onnx_fname;
-        std::cout << "\nNew best model by loss: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by loss: \"" << onnx_fname << "\"\n";
       } else { // Improves loss and acc
         best_acc = val_acc;
         best_loss = val_loss;
@@ -412,7 +410,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
         onnx_fname = (ckpts_path / onnx_name).string();
         best_model_byloss = onnx_fname;
         best_model_byacc = onnx_fname;
-        std::cout << "\nNew best model by loss and acc: \"" << onnx_fname << "\"\n";
+        std::cout << "New best model by loss and acc: \"" << onnx_fname << "\"\n\n";
       }
 
       save_net_to_onnx_file(model, onnx_fname);

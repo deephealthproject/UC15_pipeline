@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   exp_name += "_input-" + to_string(args.target_shape[0]) + "x" + to_string(args.target_shape[1]);
   exp_name += "_opt-" + args.optimizer;
   exp_name += "_lr-" + to_string(args.learning_rate);
-  std::cout << "\nGoing to run the experiment \"" << exp_name << "\"\n";
+  std::cout << "Going to run the experiment \"" << exp_name << "\"\n";
 
   // Set the seed to reproduce the experiments
   ecvl::AugmentationParam::SetSeed(args.seed);
@@ -31,21 +31,25 @@ int main(int argc, char **argv) {
   // Prepare data augmentations for each split
   ecvl::DatasetAugmentations data_augmentations{get_augmentations(args)};
   ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations);
-  std::cout << "\nCreated ECVL DL Dataset from \"" << args.yaml_path << "\"\n";
+  std::cout << "\nCreated ECVL DL Dataset from \"" << args.yaml_path << "\"\n\n";
   // Show basic dataset info
   dataset_summary(dataset, args);
 
+  std::cout << "\n";
+  std::cout << "##################\n";
+  std::cout << "# Model creation #\n";
+  std::cout << "##################\n";
   Net *model;
   bool init_weights = true;
   if (args.ckpt.empty()) {
     // Create the model topology selected
-    std::cout << "\nGoing to prepare the model \"" << args.model << "\"\n";
+    std::cout << "Going to prepare the model \"" << args.model << "\"\n";
     auto in_shape = {dataset.n_channels_, args.target_shape[0], args.target_shape[1]};
     model = get_model(args.model, in_shape, dataset.classes_.size());
     std::cout << "Model created!\n";
   } else {
     // Load the ONNX model as checkpoint
-    std::cout << "\nGoing to load the model from \"" << args.ckpt << "\"\n";
+    std::cout << "Going to load the model from \"" << args.ckpt << "\"\n";
     model = import_net_from_onnx_file(args.ckpt);
     init_weights = false; // Avoid to override the imported weights
     std::cout << "Model loaded!\n";
@@ -60,16 +64,14 @@ int main(int argc, char **argv) {
     cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
 
   eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
-  std::cout << "Model built!\n";
+  std::cout << "Model built!\n\n";
 
-  std::cout << "\n";
   std::cout << "###############\n";
   std::cout << "# Train phase #\n";
   std::cout << "###############\n";
   TrainResults tr_res = train(dataset, model, exp_name, args);
   delete model; // Free the memory before the test phase
 
-  std::cout << "\n";
   std::cout << "##############\n";
   std::cout << "# Test phase #\n";
   std::cout << "##############\n";
@@ -78,7 +80,7 @@ int main(int argc, char **argv) {
     test_models_paths.push_back(tr_res.best_model_by_acc);
 
   for (auto &onnx_path : test_models_paths) {
-    std::cout << "\nGoing to run test with model \"" << onnx_path << "\"\n\n";
+    std::cout << "Going to run test with model \"" << onnx_path << "\"\n\n";
     // Load the model for testing
     model = import_net_from_onnx_file(onnx_path);
 
