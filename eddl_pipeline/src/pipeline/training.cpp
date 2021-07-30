@@ -1,6 +1,7 @@
 #include "training.hpp"
 #include <chrono>
 #include <eddl/serialization/onnx/eddl_onnx.h>
+#include <fstream>
 
 #include "data_generator.hpp"
 
@@ -236,9 +237,7 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
   auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
 
   // Store the training history in a CSV
-  std::ofstream tr_hist_csv((exp_path / "train_res.csv").string());
-  tr_hist_csv << results.train_hist_csv_str();
-  tr_hist_csv.close();
+  results.save_hist_to_csv((exp_path / "train_res.csv").string());
 
   return results;
 }
@@ -449,9 +448,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
   auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
 
   // Store the training history in a CSV
-  std::ofstream tr_hist_csv((exp_path / "train_res.csv").string());
-  tr_hist_csv << results.train_hist_csv_str();
-  tr_hist_csv.close();
+  results.save_hist_to_csv((exp_path / "train_res.csv").string());
 
   return results;
 }
@@ -469,16 +466,16 @@ Optimizer *get_optimizer(const std::string &opt_name,
   exit(EXIT_FAILURE);
 }
 
-std::string TrainResults::train_hist_csv_str() const {
-  std::stringstream res;
+void TrainResults::save_hist_to_csv(const std::string &csv_path) const {
+  std::ofstream out_csv(csv_path);
   // Set the CSV header
-  res << "epoch,loss,acc,val_loss,val_acc\n";
+  out_csv << "epoch,loss,acc,val_loss,val_acc\n";
   // Add a row for each epoch
   for (int e = 0; e < losses.size(); ++e) {
-    res << e + 1 << ",";
-    res << losses[e] << "," << accs[e] << ",";  // Train split
-    res << val_losses[e] << "," << val_accs[e]; // Validation split
-    if (e != losses.size()) res << "\n";
+    out_csv << e + 1 << ",";
+    out_csv << losses[e] << "," << accs[e] << ",";  // Train split
+    out_csv << val_losses[e] << "," << val_accs[e]; // Validation split
+    if (e != losses.size()) out_csv << "\n";
   }
-  return res.str();
+  out_csv.close();
 }
