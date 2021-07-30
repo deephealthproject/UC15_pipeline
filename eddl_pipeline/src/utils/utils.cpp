@@ -32,6 +32,8 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_vec_attr("target_shape", args.target_shape); out << ",\n";
   print_num_attr("epochs", args.epochs); out << ",\n";
   print_num_attr("batch_size", args.batch_size); out << ",\n";
+  print_num_attr("use_dldataset", args.use_dldataset); out << ",\n";
+  print_num_attr("workers", args.workers); out << ",\n";
   print_vec_attr("gpus", args.gpus); out << ",\n";
   print_num_attr("lsb", args.lsb); out << ",\n";
   print_num_attr("cpu", args.cpu); out << ",\n";
@@ -57,6 +59,8 @@ Arguments parse_arguments(int argc, char **argv) {
     ("t,target_shape", "Height and Width to resize the images", cxxopts::value<std::vector<int>>()->default_value("256,256"))
     ("e,epochs", "Number of training epochs", cxxopts::value<int>()->default_value("10"))
     ("b,batch_size", "Number of samples per minibatch", cxxopts::value<int>()->default_value("32"))
+    ("u,use_dldataset", "Use DLDataset to load the batches instead of the multithreaded DataGenerator", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+    ("w,workers", "Number of workers threads to load batches in the DataGenerator", cxxopts::value<int>()->default_value("1"))
     ("g,gpus", "GPUs to use. Selected with a bit mask: \"1,1\" for two gpus", cxxopts::value<std::vector<int>>()->default_value("1"))
     ("lsb", "Number of batches to process between GPUs synchronizations", cxxopts::value<int>()->default_value("1"))
     ("c,cpu", "Use computing service CPU", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -83,6 +87,8 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["target_shape"].as<std::vector<int>>(),
                    result["epochs"].as<int>(),
                    result["batch_size"].as<int>(),
+                   result["use_dldataset"].as<bool>(),
+                   result["workers"].as<int>(),
                    result["gpus"].as<std::vector<int>>(),
                    result["lsb"].as<int>(),
                    result["cpu"].as<bool>(),
