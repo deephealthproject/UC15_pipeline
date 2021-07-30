@@ -11,14 +11,13 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   };
   // Auxiliary lambda to print numeric attributes
   auto print_num_attr = [&out](const std::string &k, const auto &v) {
-    out << "    \"" << k << "\": " << std::to_string(v);
+    out << "    \"" << k << "\": " << v;
   };
   // Auxiliary lambda to print vector<int> attributes
   auto print_vec_attr = [&out](const std::string &k, const std::vector<int> &v) {
     out << "    \"" << k << "\": [";
     for (int i = 0; i < v.size(); ++i) {
-      out << "\n        "; // 8 spaces for double tabulation
-      out << std::to_string(v[i]);
+      out << "\n        " << v[i]; // 8 spaces for double tabulation
       if (i != v.size() - 1)
         out << ",";
       else

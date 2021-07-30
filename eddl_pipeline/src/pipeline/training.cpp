@@ -310,7 +310,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_train_batch=" << (train_time / b) * 1e-6 << "s ]";
-      std::cout << " - DataGenerator[ loaded_batches = " << tr_datagen.Size() << " ]";
+      std::cout << " - DataGenerator[ |fifo| = " << tr_datagen.Size() << " ]";
       std::cout << std::endl;
 
       // Free memory for the next batch;
@@ -363,7 +363,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       std::cout << " - Timers[ ";
       std::cout << "avg_load_batch=" << (load_time / b) * 1e-6 << "s";
       std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
-      std::cout << " - DataGenerator[ loaded_batches = " << val_datagen.Size() << " ]";
+      std::cout << " - DataGenerator[ |fifo| = " << val_datagen.Size() << " ]";
       std::cout << std::endl;
 
       // Free memory for the next batch;

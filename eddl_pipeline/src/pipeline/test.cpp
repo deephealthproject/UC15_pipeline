@@ -124,7 +124,7 @@ TestResults test_datagen(ecvl::DLDataset &dataset, Net *model, Arguments &args) 
     std::cout << " - Timers[ ";
     std::cout << "avg_load_batch=" << (load_time / b)  * 1e-6 << "s";
     std::cout << ", avg_eval_batch=" << (eval_time / b) * 1e-6 << "s ]";
-    std::cout << " - DataGenerator[ loaded_batches = " << datagen.Size() << " ]";
+    std::cout << " - DataGenerator[ |fifo| = " << datagen.Size() << " ]";
     std::cout << std::endl;
 
     // Free memory for the next batch;
