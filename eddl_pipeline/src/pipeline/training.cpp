@@ -92,6 +92,7 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
   Tensor *y = new Tensor({args.batch_size, static_cast<int>(dataset.classes_.size())});
 
   for (int e = 1; e <= args.epochs; ++e) {
+    std::cout << "Starting epoch " << e << "/" << args.epochs << ":\n";
     // Reset batch counter and shuffle all the data splits
     dataset.ResetAllBatches(true);
 
@@ -283,6 +284,7 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
   json_args.close();
 
   for (int e = 1; e <= args.epochs; ++e) {
+    std::cout << "Starting epoch " << e << "/" << args.epochs << ":\n";
     // Reset batch counter and shuffle all the data splits
     dataset.ResetAllBatches(true);
 

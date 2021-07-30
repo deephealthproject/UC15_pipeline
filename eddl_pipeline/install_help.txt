@@ -2,6 +2,13 @@
 # 1 - Install EDDL #
 ####################
 
+# Install EDDL with CONDA
+# 1.1 First create a conda environment and activate it
+# 1.2 Install EDDL
+conda install -c deephealth eddl-cudnn
+# WARNING: Not tested with the next installation steps. The ECVL install flag "-Deddl_DIR" can be different
+# The next installation steps have been tested with the EDDL installation from sources
+
 ###########################################
 # 2 - Install OpenCV (dependency of ECVL) #
 ###########################################
