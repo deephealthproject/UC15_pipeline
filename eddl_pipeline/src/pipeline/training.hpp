@@ -10,19 +10,25 @@
 #include "../utils/utils.hpp"
 
 struct TrainResults {
-  std::vector<float> loss;        // train loss
-  std::vector<float> acc;         // train accuracy
-  std::vector<float> val_loss;    // validation loss
-  std::vector<float> val_acc;     // validation accuracy
+  // Metrics from each epoch
+  std::vector<float> losses;
+  std::vector<float> accs;
+  std::vector<float> val_losses;
+  std::vector<float> val_accs;
+
   std::string best_model_by_loss; // string path to the ONNX
   std::string best_model_by_acc;  // string path to the ONNX
 
-  TrainResults(const std::vector<float> loss, std::vector<float> acc,
-               std::vector<float> val_loss, std::vector<float> val_acc,
+  TrainResults(const std::vector<float> losses, std::vector<float> accs,
+               std::vector<float> val_losses, std::vector<float> val_accs,
                std::string best_model_by_loss, std::string best_model_by_acc)
-      : loss(loss), acc(acc), val_loss(val_loss), val_acc(val_acc),
+      : losses(losses), accs(accs), val_losses(val_losses), val_accs(val_accs),
         best_model_by_loss(best_model_by_loss),
         best_model_by_acc(best_model_by_acc) {}
+
+  // Returns a string with the CSV representation of the history data of
+  // losses and accuracies from the training phase
+  std::string train_hist_csv_str() const;
 };
 
 void dataset_summary(ecvl::DLDataset &dataset, const Arguments &args);

@@ -233,7 +233,14 @@ TrainResults train_dataset(ecvl::DLDataset &dataset, Net *model,
   delete x;
   delete y;
 
-  return TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
+  auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
+
+  // Store the training history in a CSV
+  std::ofstream tr_hist_csv((exp_path / "train_res.csv").string());
+  tr_hist_csv << results.train_hist_csv_str();
+  tr_hist_csv.close();
+
+  return results;
 }
 
 TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
@@ -439,7 +446,14 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     std::cout << "Validation[ val_loss=" << val_losses.back() << ", val_acc=" << val_accs.back() << " ]\n\n";
   }
 
-  return TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
+  auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
+
+  // Store the training history in a CSV
+  std::ofstream tr_hist_csv((exp_path / "train_res.csv").string());
+  tr_hist_csv << results.train_hist_csv_str();
+  tr_hist_csv.close();
+
+  return results;
 }
 
 Optimizer *get_optimizer(const std::string &opt_name,
@@ -453,4 +467,18 @@ Optimizer *get_optimizer(const std::string &opt_name,
             << "\") is not valid!\n";
   std::cout << "The valid optimizers are: Adam SGD\n";
   exit(EXIT_FAILURE);
+}
+
+std::string TrainResults::train_hist_csv_str() const {
+  std::stringstream res;
+  // Set the CSV header
+  res << "epoch,loss,acc,val_loss,val_acc\n";
+  // Add a row for each epoch
+  for (int e = 0; e < losses.size(); ++e) {
+    res << e + 1 << ",";
+    res << losses[e] << "," << accs[e] << ",";  // Train split
+    res << val_losses[e] << "," << val_accs[e]; // Validation split
+    if (e != losses.size()) res << "\n";
+  }
+  return res.str();
 }
