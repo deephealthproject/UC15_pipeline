@@ -33,6 +33,7 @@ private:
 
   bool active_;
   int num_batches_;
+  int active_producers_;
 
 public:
   DataGenerator(ecvl::DLDataset *source, int batch_size,
@@ -46,6 +47,9 @@ public:
   bool HasNext();
   size_t Size();
   bool PopBatch(Tensor *&x, Tensor *&y);
+
+  void increase_producers();
+  void decrease_producers();
 };
 
 #endif

@@ -308,7 +308,8 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
       if (!batch_loaded) {
         std::cerr << "Error! The batch number " << b << " failed to load!" << std::endl;
-        std::abort();
+        //std::abort(); -- it could happen that HasNext() returns true because there is still one producer pending to finish, not necessary to abort.
+        continue;
       }
 
       // Perform training

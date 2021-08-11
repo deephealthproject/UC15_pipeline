@@ -14,6 +14,7 @@ DataGenerator::DataGenerator(ecvl::DLDataset *source, int batch_size,
 
   active_ = false;
   batch_index_ = 0;
+  this->active_producers_ = 0;
 }
 
 DataGenerator::~DataGenerator() {
@@ -43,6 +44,7 @@ void DataGenerator::Start() {
 
   batch_index_ = 0;
   active_ = true;
+  this->active_producers_ = 0;
   for (int i = 0; i < n_producers_; i++) {
     producers_[i] = std::thread(&DataGenerator::ThreadProducer, this);
   }
@@ -59,9 +61,29 @@ void DataGenerator::Stop() {
   active_ = false;
   for (int i = 0; i < n_producers_; i++)
     producers_[i].join();
+  this->active_producers_ = 0;
+}
+
+void DataGenerator::increase_producers()
+{
+    // Critical region starts
+    std::unique_lock<std::mutex> lck(mutex_batch_index_);
+
+    this->active_producers_++;
+    // Critical region ends
+}
+void DataGenerator::decrease_producers()
+{
+    // Critical region starts
+    std::unique_lock<std::mutex> lck(mutex_batch_index_);
+
+    this->active_producers_--;
+    // Critical region ends
 }
 
 void DataGenerator::ThreadProducer() {
+
+  this->increase_producers();
   std::queue<TensorPair *> my_cache;
 
   while (active_ && batch_index_ < num_batches_) {
@@ -120,10 +142,13 @@ void DataGenerator::ThreadProducer() {
     } // Critical region ends
     cond_var_fifo_.notify_one();
   }
+
+  this->decrease_producers();
 }
 
 bool DataGenerator::HasNext() {
-  return batch_index_ < num_batches_ || !fifo_.empty();
+  //return batch_index_ < num_batches_ || !fifo_.empty();
+  return batch_index_ < num_batches_ || !fifo_.empty() || this->active_producers_ > 0;
 }
 
 size_t DataGenerator::Size() { return fifo_.size(); }

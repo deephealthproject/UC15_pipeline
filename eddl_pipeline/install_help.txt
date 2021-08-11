@@ -22,6 +22,7 @@ pushd opencv > /dev/null
 # 2.2 - Configure build
 mkdir build
 cd build
+# use option -DBUILD_TIFF=ON for cmake if LIBTIFF_4.0 link errors appear
 cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX ..  # Set install path to conda environment
 
 # 2.3 - Compile and install

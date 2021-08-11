@@ -30,7 +30,8 @@ int main(int argc, char **argv) {
 
   // Prepare data augmentations for each split
   ecvl::DatasetAugmentations data_augmentations{get_augmentations(args)};
-  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations);
+  //ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, ecvl::ColorType::GRAY);
+  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, ecvl::ColorType::RGB);
   std::cout << "\nCreated ECVL DL Dataset from \"" << args.yaml_path << "\"\n\n";
   // Show basic dataset info
   dataset_summary(dataset, args);
@@ -64,7 +65,9 @@ int main(int argc, char **argv) {
     cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
 
   eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
+  //eddl::build(model, opt, {"mse"}, {"accuracy"}, cs, init_weights);
   std::cout << "Model built!\n\n";
+  eddl::summary(model);
 
   std::cout << "###############\n";
   std::cout << "# Train phase #\n";
