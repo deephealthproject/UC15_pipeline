@@ -291,6 +291,9 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     // Reset the accumulated loss value
     eddl::reset_loss(model);
 
+    int counter_samples = 0;
+    float sum_class_0 = 0;
+
     // Training phase
     float load_time = 0.f;
     float train_time = 0.f;
@@ -302,8 +305,13 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     for (int b = 1; tr_datagen.HasNext(); ++b) {
       // Load data
       const auto load_start = std::chrono::high_resolution_clock::now();
-      Tensor *x, *y;
+      Tensor *x, *y, *z;
       bool batch_loaded = tr_datagen.PopBatch(x, y);
+      z = y->select({":", "1"});
+      z->reshape_({-1});
+      //z->info();
+      //z->print();
+      for (int i = 0; i < y->shape[0]; i++) { ++counter_samples; sum_class_0 += y->ptr[i * y->stride[0]]; }
       const auto load_end = std::chrono::high_resolution_clock::now();
       load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
       if (!batch_loaded) {
@@ -314,7 +322,11 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
 
       // Perform training
       const auto train_start = std::chrono::high_resolution_clock::now();
-      eddl::train_batch(model, {x}, {y});
+      if (args.classifier_output == "sigmoid" && dataset.classes_.size() == 2) {
+          eddl::train_batch(model, {x}, {z});
+      } else {
+          eddl::train_batch(model, {x}, {y});
+      }
       const auto train_end = std::chrono::high_resolution_clock::now();
       train_time += std::chrono::duration_cast<std::chrono::microseconds>(train_end - train_start).count();
 
@@ -336,11 +348,13 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       // Free memory for the next batch;
       delete x;
       delete y;
+      delete z;
     }
     tr_datagen.Stop();
     const auto epoch_tr_end = std::chrono::high_resolution_clock::now();
     const float epoch_tr_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_tr_end - epoch_tr_start).count();
     std::cout << "Epoch " << e << "/" << args.epochs << ": training time elapsed = " << epoch_tr_time * 1e-6 << "s\n\n";
+    std::cout << "result of blind assignment to class 0: " << sum_class_0 << " / " << counter_samples << " = " << sum_class_0 / counter_samples << std::endl;
 
     // Store the train split metrics for the current epoch
     losses.push_back(curr_loss);
@@ -348,6 +362,9 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
 
     // Reset the accumulated loss value
     eddl::reset_loss(model);
+
+    counter_samples = 0;
+    sum_class_0 = 0;
 
     // Validation phase
     load_time = 0.f;
@@ -360,8 +377,11 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     for (int b = 1; val_datagen.HasNext(); ++b) {
       // Load data
       const auto load_start = std::chrono::high_resolution_clock::now();
-      Tensor *x, *y;
+      Tensor *x, *y, *z;
       bool batch_loaded = val_datagen.PopBatch(x, y);
+      z = y->select({":", "1"});
+      z->reshape_({-1});
+      for (int i = 0; i < y->shape[0]; i++) { ++counter_samples; sum_class_0 += y->ptr[i * y->stride[0]]; }
       const auto load_end = std::chrono::high_resolution_clock::now();
       load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
       if (!batch_loaded) {
@@ -371,7 +391,11 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
 
       // Perform evaluation
       const auto eval_start = std::chrono::high_resolution_clock::now();
-      eddl::eval_batch(model, {x}, {y});
+      if (args.classifier_output == "sigmoid" && dataset.classes_.size() == 2) {
+          eddl::eval_batch(model, {x}, {z});
+      } else {
+          eddl::eval_batch(model, {x}, {y});
+      }
       const auto eval_end = std::chrono::high_resolution_clock::now();
       eval_time += std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
@@ -393,11 +417,13 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
       // Free memory for the next batch;
       delete x;
       delete y;
+      delete z;
     }
     val_datagen.Stop();
     const auto epoch_val_end = std::chrono::high_resolution_clock::now();
     const float epoch_val_time = std::chrono::duration_cast<std::chrono::microseconds>(epoch_val_end - epoch_val_start).count();
     std::cout << "Epoch " << e << "/" << args.epochs << ": validation time elapsed = " << epoch_val_time * 1e-6 << "s\n\n";
+    std::cout << "result of blind assignment to class 0: " << sum_class_0 << " / " << counter_samples << " = " << sum_class_0 / counter_samples << std::endl;
 
     // Store the validation split metrics for the current epoch
     val_losses.push_back(curr_loss);
@@ -446,22 +472,22 @@ TrainResults train_datagen(ecvl::DLDataset &dataset, Net *model,
     std::cout << std::fixed << std::setprecision(4);
     std::cout << "Training[ loss=" << losses.back() << ", acc=" << accs.back() << " ] - ";
     std::cout << "Validation[ val_loss=" << val_losses.back() << ", val_acc=" << val_accs.back() << " ]\n\n";
+
+  auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
+  // Store the training history in a CSV
+  results.save_hist_to_csv((exp_path / "train_res.csv").string());
   }
 
   auto results = TrainResults(losses, accs, val_losses, val_accs, best_model_byloss, best_model_byacc);
-
-  // Store the training history in a CSV
-  results.save_hist_to_csv((exp_path / "train_res.csv").string());
 
   return results;
 }
 
 Optimizer *get_optimizer(const std::string &opt_name,
                          const float learning_rate) {
-  if (opt_name == "Adam")
-    return eddl::adam(learning_rate);
-  if (opt_name == "SGD")
-    return eddl::sgd(learning_rate, 0.9);
+  if (opt_name == "Adam")    return eddl::adam(learning_rate);
+  if (opt_name == "SGD")     return eddl::sgd(learning_rate, 0.9);
+  if (opt_name == "RMSprop") return eddl::rmsprop(learning_rate);
 
   std::cout << "The optimizer name provided (\"" << opt_name
             << "\") is not valid!\n";

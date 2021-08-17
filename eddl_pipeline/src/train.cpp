@@ -30,8 +30,15 @@ int main(int argc, char **argv) {
 
   // Prepare data augmentations for each split
   ecvl::DatasetAugmentations data_augmentations{get_augmentations(args)};
-  //ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, ecvl::ColorType::GRAY);
-  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, ecvl::ColorType::RGB);
+  auto color_type = ecvl::ColorType::GRAY;
+  if (args.rgb_or_gray == "RGB") {
+    color_type = ecvl::ColorType::RGB;
+  } else if (args.rgb_or_gray == "gray" || args.rgb_or_gray == "grey") {
+    color_type = ecvl::ColorType::GRAY;
+  } else
+    std::cerr << "\nERROR: non-recognized color/monochrome specification \"" << args.rgb_or_gray << "\"\n\n";
+
+  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, color_type);
   std::cout << "\nCreated ECVL DL Dataset from \"" << args.yaml_path << "\"\n\n";
   // Show basic dataset info
   dataset_summary(dataset, args);
@@ -46,7 +53,7 @@ int main(int argc, char **argv) {
     // Create the model topology selected
     std::cout << "Going to prepare the model \"" << args.model << "\"\n";
     auto in_shape = {dataset.n_channels_, args.target_shape[0], args.target_shape[1]};
-    model = get_model(args.model, in_shape, dataset.classes_.size());
+    model = get_model(args.model, in_shape, dataset.classes_.size(), args.classifier_output);
     std::cout << "Model created!\n";
   } else {
     // Load the ONNX model as checkpoint
@@ -64,8 +71,19 @@ int main(int argc, char **argv) {
   else
     cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
 
-  eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
-  //eddl::build(model, opt, {"mse"}, {"accuracy"}, cs, init_weights);
+  if (args.classifier_output == "softmax") {
+    eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
+  } else if (args.classifier_output == "sigmoid") {
+    if (dataset.classes_.size() == 2) {
+        eddl::build(model, opt, {"binary_cross_entropy"}, {"binary_accuracy"}, cs, init_weights);
+    } else {
+      eddl::build(model, opt, {"mse"}, {"categorical_accuracy"}, cs, init_weights);
+      //eddl::build(model, opt, {"cross_entropy"}, {"categorical_accuracy"}, cs, init_weights);
+    }
+  } else {
+    std::cerr << "ERROR: unexpected classifier output: " << args.classifier_output << std::endl;
+    std::abort();
+  }
   std::cout << "Model built!\n\n";
   eddl::summary(model);
 
@@ -93,7 +111,20 @@ int main(int argc, char **argv) {
       cs = eddl::CS_CPU(-1, "full_mem");
     else
       cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
-    eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs);
+
+    if (args.classifier_output == "softmax") {
+      eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, false);
+    } else if (args.classifier_output == "sigmoid") {
+      if (dataset.classes_.size() == 2) {
+        eddl::build(model, opt, {"binary_cross_entropy"}, {"binary_accuracy"}, cs, false);
+      } else {
+        eddl::build(model, opt, {"mse"}, {"categorical_accuracy"}, cs, false);
+        //eddl::build(model, opt, {"cross_entropy"}, {"categorical_accuracy"}, cs, false);
+      }
+    } else {
+      std::cerr << "ERROR: unexpected classifier output: " << args.classifier_output << std::endl;
+      std::abort();
+    }
 
     TestResults te_res = test(dataset, model, args);
 

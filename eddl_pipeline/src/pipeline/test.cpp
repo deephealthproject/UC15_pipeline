@@ -102,8 +102,10 @@ TestResults test_datagen(ecvl::DLDataset &dataset, Net *model, Arguments &args) 
   for (int b = 1; datagen.HasNext(); ++b) {
     // Load data
     const auto load_start = std::chrono::high_resolution_clock::now();
-    Tensor *x, *y;
+    Tensor *x, *y, *z;
     bool batch_loaded = datagen.PopBatch(x, y);
+    z = y->select({":", "1"});
+    z->reshape_({-1});
     const auto load_end = std::chrono::high_resolution_clock::now();
     load_time += std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
     if (!batch_loaded) {
@@ -113,7 +115,11 @@ TestResults test_datagen(ecvl::DLDataset &dataset, Net *model, Arguments &args) 
 
     // Perform evaluation
     const auto eval_start = std::chrono::high_resolution_clock::now();
-    eddl::eval_batch(model, {x}, {y});
+    if (args.classifier_output == "sigmoid" && dataset.classes_.size() == 2) {
+        eddl::eval_batch(model, {x}, {z});
+    } else {
+        eddl::eval_batch(model, {x}, {y});
+    }
     const auto eval_end = std::chrono::high_resolution_clock::now();
     eval_time += std::chrono::duration_cast<std::chrono::microseconds>(eval_end - eval_start).count();
 
@@ -134,6 +140,7 @@ TestResults test_datagen(ecvl::DLDataset &dataset, Net *model, Arguments &args) 
     // Free memory for the next batch;
     delete x;
     delete y;
+    delete z;
   }
   datagen.Stop();
   const auto test_end = std::chrono::high_resolution_clock::now();
