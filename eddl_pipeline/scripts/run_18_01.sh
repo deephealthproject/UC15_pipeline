@@ -12,7 +12,7 @@ scripts/train.sh --yaml_path ${yaml_filename} \
                 --classifier_output sigmoid \
                 --augmentations 2.2 \
                 --epochs 1000 \
-                --batch_size 2 \
-                --optimizer Adam --learning_rate 1.0e-5 \
+                --batch_size 10 \
+                --optimizer SGD --learning_rate 1.0e-3 \
                 --target_shape 1024,1024 \
                 --workers 7

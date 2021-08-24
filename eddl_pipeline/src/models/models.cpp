@@ -29,6 +29,18 @@ Net *model_1(const std::vector<int> in_shape, const int num_classes, const std::
   return eddl::Model({in_}, {out_});
 }
 
+Layer * block_2a(Layer * l_in, int num_filters, float l2_alpha)
+{
+    Layer * l = l_in;
+
+    l = eddl::Dropout(l, 0.5f);
+    l = eddl::Conv2D(l, num_filters, {5, 5}, {2, 2}, "valid");
+    l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+
+    return l;
+}
+
 Net *model_2a(const std::vector<int> in_shape, const int num_classes, const std::string & classifier_output)
 {
     Layer *in_ = eddl::Input(in_shape);
@@ -36,58 +48,38 @@ Net *model_2a(const std::vector<int> in_shape, const int num_classes, const std:
 
     float l2_alpha = 1.0e-5;
 
-    int filters = 37;
-    l_ = eddl::Conv2D(l_, filters, {13, 13}, {2, 2}, "valid");
+    int num_filters = 37;
+    l_ = eddl::Conv2D(l_, num_filters, {13, 13}, {2, 2}, "valid");
     l_ = eddl::L2(l_, l2_alpha);
     l_ = eddl::ReLu(l_);
 
-    filters <<= 1;
-    
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
+    num_filters <<= 1;
+    l_ = block_2a(l_, num_filters, l2_alpha);
+    num_filters <<= 1;
+    l_ = block_2a(l_, num_filters, l2_alpha);
+    l_ = block_2a(l_, num_filters, l2_alpha);
+    l_ = block_2a(l_, num_filters, l2_alpha);
+    num_filters <<= 1;
+    l_ = block_2a(l_, num_filters, l2_alpha);
+    l_ = block_2a(l_, num_filters, l2_alpha);
+
+    num_filters <<= 1;
+    l_ = eddl::Conv2D(l_, num_filters, {3, 3}, {1, 1}, "valid");
     l_ = eddl::L2(l_, l2_alpha);
     l_ = eddl::ReLu(l_);
-
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
+    /*
+    l_ = eddl::Conv2D(l_, num_filters, {2, 2}, {1, 1}, "valid");
     l_ = eddl::L2(l_, l2_alpha);
     l_ = eddl::ReLu(l_);
-
-    filters <<= 1;
-
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
-
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
-
-    filters <<= 1;
-
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
-
-    l_ = eddl::Conv2D(l_, filters, {5, 5}, {2, 2}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
-
-    filters <<= 1;
-
-    l_ = eddl::Conv2D(l_, filters, {3, 3}, {1, 1}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
-
-    filters <<= 1;
-
-    l_ = eddl::Conv2D(l_, filters, {2, 2}, {1, 1}, "valid");
-    l_ = eddl::L2(l_, l2_alpha);
-    l_ = eddl::ReLu(l_);
+    */
 
     // Dense block
     l_ = eddl::Flatten(l_);
+    l_ = eddl::Dropout(l_, 0.5f);
     l_ = eddl::Dense(l_, 1024);
     l_ = eddl::L2(l_, l2_alpha);
     l_ = eddl::ReLu(l_);
+    l_ = eddl::Dropout(l_, 0.5f);
 
     // Output layer
     Layer *out_ = nullptr;
@@ -165,7 +157,9 @@ Net *model_2c(const std::vector<int> in_shape, const int num_classes, const std:
 }
 Layer * block_3a(Layer * l_in, int num_filters, float l2_alpha)
 {
-    Layer * l = eddl::Conv2D(l_in, num_filters, {3, 3}, {1, 1}, "same");
+    Layer * l = l_in;
+    l = eddl::Dropout(l, 0.5);
+    l = eddl::Conv2D(l, num_filters, {3, 3}, {1, 1}, "same");
     l = eddl::L2(l, l2_alpha);
     l = eddl::ReLu(l);
     l = eddl::MaxPool2D(l, {2, 2}, {2, 2});
@@ -257,11 +251,62 @@ Net *model_3a(const std::vector<int> in_shape, const int num_classes, const std:
 
     // Dense block
     l = eddl::Flatten(l);
+    l = eddl::Dropout(l, 0.5);
     //l = eddl::ReLu(eddl::L2(eddl::Dense(l, 1024), l2_alpha));
     l = eddl::ReLu(eddl::L2(eddl::Dense(l,  512), l2_alpha));
+    l = eddl::Dropout(l, 0.5);
 
 
     // Output layer
+    // Output layer
+    Layer *out_ = nullptr;
+    if (classifier_output == "sigmoid")
+        out_ = eddl::Sigmoid(eddl::Dense(l, num_classes == 2 ? 1 : num_classes));
+    else
+        out_ = eddl::Softmax(eddl::Dense(l, num_classes));
+
+    return eddl::Model({in_}, {out_});
+}
+Layer * block_3b(Layer * l_in, int num_filters, float l2_alpha, float dropout_rate)
+{
+    Layer * l = l_in;
+
+    if (dropout_rate > 0.0)
+        l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Conv2D(l, num_filters, {3, 3}, {1, 1}, "same");
+    l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::MaxPool2D(l, {2, 2}, {2, 2});
+    return l;
+}
+Net *model_3b(const std::vector<int> in_shape, const int num_classes, const std::string & classifier_output)
+{
+    Layer *in_ = eddl::Input(in_shape);
+
+    float l2_alpha = 1.0e-6f;
+    float dropout_rate = 0.5f;
+
+    Layer * i_a = eddl::Conv2D(in_, 16, { 3,  3}, {1, 1}, "same"); 
+    Layer * i_b = eddl::Conv2D(in_, 32, { 7,  7}, {1, 1}, "same");
+    Layer * i_c = eddl::Conv2D(in_, 32, {11, 11}, {1, 1}, "same");
+
+    Layer * l = eddl::Concat({i_a, i_b, i_c}); // 512 x 512
+
+    l = block_3b(l,  64, l2_alpha, dropout_rate); // 256 x 256
+    l = block_3b(l,  64, l2_alpha, dropout_rate); // 128 x 128
+    l = block_3b(l, 128, l2_alpha, dropout_rate); // 64 x 64
+    l = block_3b(l, 128, l2_alpha, dropout_rate); // 32 x 32
+    l = block_3b(l, 256, l2_alpha, dropout_rate); // 16 x 16
+    l = block_3b(l, 256, l2_alpha, dropout_rate); // 8 x 8
+    l = block_3b(l, 512, l2_alpha, dropout_rate); // 4 x 4
+    l = block_3b(l, 512, l2_alpha, dropout_rate); // 2 x 2
+
+    // Dense block
+    l = eddl::Flatten(l);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::ReLu(eddl::L2(eddl::Dense(l, 1024), l2_alpha));
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+
     // Output layer
     Layer *out_ = nullptr;
     if (classifier_output == "sigmoid")
@@ -283,6 +328,7 @@ Net *get_model(const std::string &model_name,
   if (model_name == "model_2b") return model_2b(in_shape, num_classes, classifier_output);
   if (model_name == "model_2c") return model_2c(in_shape, num_classes, classifier_output);
   if (model_name == "model_3a") return model_3a(in_shape, num_classes, classifier_output);
+  if (model_name == "model_3b") return model_3b(in_shape, num_classes, classifier_output);
 
   std::cout << "The model name provided (\"" << model_name
             << "\") is not valid!\n";

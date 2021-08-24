@@ -99,7 +99,24 @@ ecvl::DatasetAugmentations augmentations_v2_2(const Arguments &args) {
   // Training Split
   auto tr_augs = std::make_shared<ecvl::SequentialAugmentationContainer>(
       ecvl::AugResizeDim(args.target_shape, ecvl::InterpolationType::area),
-      ecvl::AugRotate({-90, 90}),
+      ecvl::AugRotate({-45, 45}),
+      ecvl::AugToFloat32(255.0));
+  // Validation Split
+  auto val_augs = std::make_shared<ecvl::SequentialAugmentationContainer>(
+      ecvl::AugResizeDim(args.target_shape, ecvl::InterpolationType::area),
+      ecvl::AugToFloat32(255.0));
+  // Testing Split
+  auto te_augs = std::make_shared<ecvl::SequentialAugmentationContainer>(
+      ecvl::AugResizeDim(args.target_shape, ecvl::InterpolationType::area),
+      ecvl::AugToFloat32(255.0));
+
+  return ecvl::DatasetAugmentations({tr_augs, val_augs, te_augs});
+}
+ecvl::DatasetAugmentations augmentations_v2_3(const Arguments &args) {
+  // Training Split
+  auto tr_augs = std::make_shared<ecvl::SequentialAugmentationContainer>(
+      ecvl::AugResizeDim(args.target_shape, ecvl::InterpolationType::area),
+      ecvl::AugRotate({-45, 45}),
       ecvl::AugMirror(0.5f),
       ecvl::AugFlip(0.5f),
       ecvl::AugToFloat32(255.0));
@@ -122,6 +139,7 @@ ecvl::DatasetAugmentations get_augmentations(const Arguments &args) {
   if (args.augmentations == "2.0") return augmentations_v2_0(args);
   if (args.augmentations == "2.1") return augmentations_v2_1(args);
   if (args.augmentations == "2.2") return augmentations_v2_2(args);
+  if (args.augmentations == "2.3") return augmentations_v2_3(args);
 
   std::cout << "The augmentations version provided (\"" << args.augmentations
             << "\") is not valid!\n";
