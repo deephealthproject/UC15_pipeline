@@ -1,7 +1,5 @@
 # UC15 - BIMCV COVID 19+ pipeline
-This repository contains all the code developed for analyzing and processing the data, and the Deep Learning pipelines implemented using ECVL and EDDL to perform a classification task with chest X-ray images to detect COVID 19 cases and other pathologies.
-
-It also contains a replica of the ECVL+EDDL pipeline using Pytorch.
+This repository contains the implementation of a Deep Learning pipeline to perform a classification task with chest X-ray images to detect COVID 19 cases and other pathologies. Here you can find the code developed for analyzing and preprocessing the dataset and also the code of the pipeline implemented with different DL libraries: EDDL (c++), PyEDDL and Pytorch. In the case of the EDDL and PyEDDL pipelines, the ECVL library has been used to load the batches of data to feed the models.
 
 # Dataset
 You can find the BIMCV COVID 19+ dataset [here](https://bimcv.cipf.es/bimcv-projects/bimcv-covid19/). Note that there are two versions: "Iteration 1" and "Iteration 1 + 2". Download the "Iteration 1 + 2" version.
@@ -49,7 +47,15 @@ Quick notebooks and scripts guide:
 - **images_visualization.ipynb**: The aim of this notebook is tho show images. You can view random sampled images or you can select images by subject or session. It also shows the changes after applying some preprocessing to the images.
 - **data_cleaning.ipynb**: This notebook provides an interface to easily label the samples as valid or not. The labels generated are stored in a TSV that can be passed to the "prepare_ecvl_dataset.py" script to only take the samples that are valid.
 - **prepare_ecvl_dataset.py**: This script collects the needed data to prepare a YAML file for the ECVL to create a Dataset (ECVL object to load the data) for training the models. This script prepares the labels, aditional metadata and defines the dataset splits (train, validation, test).
+- **train.py**: Main script to train the models. The experiments results (metrics, ONNX checkpoints...) will be stored in a new folder named "experiments".
+- **test_ecvl_dataset.py**: A simple script to play with the ECVL DLDataset object and inspect the batches of data that are loaded.
 
 Note: The Python scripts can be run with the **-h** flag to see possible configuration arguments. You probably need to use these arguments to designate where you have decompressed the dataset.
 
-# The pipeline development is in progress...
+# C++ version of the pipeline
+
+In the folder *eddl_pipeline* there is the C++ version of the pipeline. The main feature of these version is that it uses a custom dataloader class that can load the batches of data in parallel achieving a big speed up.
+
+# Pytorch version of the pipeline
+
+In order to compare the results and performance of the EDDL another version of the pipeline has been developed using Pytorch. It's implemented in the *pytorch_pipeline* folder and has replicated many of the topologies implemented in the PyEDDL version to be able to compare the results.
