@@ -59,3 +59,44 @@ In the folder *eddl_pipeline* there is the C++ version of the pipeline. The main
 # Pytorch version of the pipeline
 
 In order to compare the results and performance of the EDDL another version of the pipeline has been developed using Pytorch. It's implemented in the *pytorch_pipeline* folder and has replicated many of the topologies implemented in the PyEDDL version to be able to compare the results.
+
+# How to run
+
+## 1. Prepare the data
+
+Regardless of the pipeline version to be run (EDDL C++, PyEDDL or Pytorch), the *prepare_ecvl_dataset.py* must be executed to prepare the YAML file that the ECVL needs to load the data or the CSV file that the Pytorch version needs.
+
+To execute this script go to the *pyeddl_pipeline* and execute the script with the arguments configuration that you want. For example:
+
+```bash
+cd pyeddl_pipeline  # Needed to find some imports of the script
+python prepare_ecvl_dataset.py --sub-path <PATH_TO_DATASET>/covid19_posi --target-labels 'normal' 'COVID 19'
+```
+Note: *<PATH_TO_DATASET>* is the path to the folder where you decompressed the dataset with the script *decompress_dataset.sh*. And with the *--target-labels* flag we created a dataset to classify between two classes: *normal* and *COVID 19*. Check all the configuration possibilities and defaults using the *--help* flag.
+
+## 2. Train
+
+### PyEDDL pipeline
+```bash
+# Inside pyeddl_pipeline folder
+python train.py --yaml-path <PATH_TO_DATASET>/covid19_posi/ecvl_bimcv_covid19.yaml
+```
+Note: You can run *python train.py --help* to see all the flags available.
+
+### EDDL C++ pipeline
+```bash
+# Inside eddl_pipeline folder
+./scripts/compile.sh # Compile the pipeline and create the executable
+./scripts/train.sh --yaml_path <PATH_TO_DATASET>/covid19_posi/ecvl_bimcv_covid19.yaml
+```
+Note: You can run *./script/train.sh --help* to see all the flags available.
+
+### Pytorch pipeline
+```bash
+# Inside pytorch_pipeline folder
+python train.py --data-tsv <PATH_TO_DATASET>/covid19_posi/ecvl_bimcv_covid19.tsv --labels 'normal' 'COVID 19'
+```
+Note: You can run *python train.py --help* to see all the flags available. The *--labels* flag is **IMPORTANT** to select the classes of interest because the tsv contains all the samples from all the classes.
+
+In the case of the EDDL C++ and PyEDDL pipelines the results from the training script (models, metrics...) are stored in the *experiments* folder (It will be created automatically).
+The Pytorch pipeline creates a *models_checkpoints* and a *logs* folder to store the results.
