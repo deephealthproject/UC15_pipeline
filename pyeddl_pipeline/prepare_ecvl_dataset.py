@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from lib.data_processing import get_labels_from_str, create_ecvl_yaml
 from lib.image_processing import preprocess_image, create_copy_with_DA
+from lib.data_processing import get_labels_from_str, create_ecvl_yaml, relabel_with_covid_tests
 
 
 def main(args):
@@ -26,36 +26,46 @@ def main(args):
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # Check arguments
     assert sum(args.splits) == 1, "The splits values sum must be 1.0!"
-
-    # Name of the directory to store the preprocessed images. It will be
-    # created inside the subjects data folder ("covid19_posi").
-    preproc_dirname = f"{args.yaml_name}_preproc_data"
 
     """
     Load and prepare data
     """
-    derivatives_path = os.path.join(args.sub_path, "derivatives")  # Aux path
+    posi_derivatives_path = os.path.join(args.posi_path, "derivatives")
+    neg_derivatives_path = os.path.join(args.neg_path, "derivatives")
 
-    # Load DataFrame with all the images (paths) by session and subject
-    partitions_tsv_path = os.path.join(derivatives_path, "partitions.tsv")
+    # Load DataFrames with all the images (paths) by session and subject
     cols = ["subject", "session", "filepath"]  # Fix the original columns
-    part_df = pd.read_csv(partitions_tsv_path, sep="\t", header=0, names=cols)
+    posi_df = pd.read_csv(os.path.join(posi_derivatives_path, "partitions.tsv"),
+                          sep="\t",
+                          header=0,
+                          names=cols)
+    neg_df = pd.read_csv(os.path.join(neg_derivatives_path, "partitions.tsv"),
+                         sep="\t",
+                         header=0,
+                         names=cols)
 
-    # Load DataFrame with the labels for each session
-    labels_tsv_path = os.path.join(derivatives_path,
-                                   "labels/labels_covid_posi.tsv")
-    labels_df = pd.read_csv(labels_tsv_path, sep="\t")
+    # Load DataFrames with the labels for each session
+    posi_labels_path = os.path.join(posi_derivatives_path, "labels/labels_covid_posi.tsv")
+    neg_labels_path = os.path.join(neg_derivatives_path, "labels/Labels_covid_NEG_JAN21.tsv")
+    posi_labels_df = pd.read_csv(posi_labels_path, sep="\t")
+    neg_labels_df = pd.read_csv(neg_labels_path, sep="\t")
 
     # Convert the strings representing the list of labels to true lists
-    labels_df["Labels"] = labels_df["Labels"].apply(get_labels_from_str)
+    posi_labels_df["Labels"] = posi_labels_df["Labels"].apply(get_labels_from_str)
+    neg_labels_df["Labels"] = neg_labels_df["Labels"].apply(get_labels_from_str)
 
-    # Load DataFrame with informaton about the subjects
-    subjects_tsv_path = os.path.join(args.sub_path, "participants.tsv")
-    subjects_df = pd.read_csv(subjects_tsv_path, sep="\t")
+    # Load DataFrames with informaton about the subjects
+    posi_sub_df = pd.read_csv(os.path.join(args.posi_path, "participants.tsv"),
+                              sep="\t")
+    neg_sub_df = pd.read_csv(os.path.join(args.neg_path, "participants.tsv"),
+                             sep="\t")
 
     """
     Use the results from the tests (like PCR) to change the labels.
+
+    ** Only available for 'posi' patients **
 
     Note: There are samples that are not labeled as "COVID 19" but the
           corresponding test for that subject for the same date of the
@@ -65,94 +75,8 @@ def main(args):
     """
 
     if not args.no_relabel:
-        # Load the results of the COVID tests
-        tests_path = os.path.join(args.sub_path,
-                                  "derivatives/EHR/sil_reg_covid_posi.tsv")
-        tests_df = pd.read_csv(tests_path, sep='\t')
-
-        # Get only the tests that are positive
-        posi_tests = tests_df[tests_df["result"] == "POSITIVO"].copy()
-        # Convert dates from strings to datetime objects
-        posi_tests["date"] = pd.to_datetime(posi_tests["date"],
-                                            format="%d.%m.%Y")
-        # Group tests by subject ID
-        #  - Note: A subject can have several tests
-        posi_tests_by_sub = posi_tests.groupby(["participant"])
-
-        # Group the sessions labels by subject ID
-        labels_by_sub = labels_df.groupby(["PatientID"])
-
-        sess_labels_fixed = 0  # Counter to show stats
-
-        # Iterate over the positive tests to check if we have to relabel
-        print("Fixing labels with COVID tests results:")
-        for sub_id, sub_tests in tqdm(posi_tests_by_sub):
-            # Load subject sessions data
-            sub_sessions_tsv = os.path.join(args.sub_path,
-                                            sub_id,
-                                            f"{sub_id}_sessions.tsv")
-            # Check if the data exists
-            if not os.path.isfile(sub_sessions_tsv):
-                continue  # skip the subject
-
-            # Load the sessions data of the current subject
-            sub_sessions_df = pd.read_csv(sub_sessions_tsv, sep="\t")
-
-            # Convert sessions dates from strings to datetime objects
-            sub_sessions_df["study_date"] = pd.to_datetime(
-                sub_sessions_df["study_date"], format="%Y%m%d")
-
-            # Get the list of labels for each session of the subject
-            #  Note: "ReportID" is the session ID
-            sub_sessions_labels = labels_by_sub.get_group(sub_id)[['ReportID',
-                                                                   'Labels']]
-
-            # Compare the labels of each session with the COVID tests
-            for idx, sess_row in sub_sessions_df.iterrows():
-                sess_id = sess_row["session_id"]
-                sess_date = sess_row["study_date"]
-
-                # Get the list of labels of the current session
-                sess_mask = sub_sessions_labels["ReportID"] == sess_id
-                sess_labels_row = sub_sessions_labels[sess_mask]
-                labels_list = sess_labels_row["Labels"].values[0]
-
-                # Skip sessions with the COVID label (Nothing to change here)
-                if 'COVID 19' in labels_list:
-                    continue
-                # Skip sessions with at least one of the labels to avoid
-                if any(l in args.labels_to_avoid for l in labels_list):
-                    continue
-                # Skip sessions without at least one mandatory label
-                if len(args.mandatory_labels):
-                    # Look for a mandatory label
-                    found = False
-                    for l in labels_list:
-                        if l in args.mandatory_labels:
-                            found = True
-                            break
-                    # If not, skip the session
-                    if not found:
-                        continue
-
-                # Look if any of the tests can affect the session labels
-                for test_date in sub_tests["date"]:
-                    # Compute time difference in days
-                    days_diff = (sess_date - test_date).days
-
-                    # Check if is a valid difference to fix the label
-                    if -args.prev_days <= days_diff <= args.post_days:
-                        # Prepare the mask to select the session images
-                        sessions_mask = labels_df["ReportID"] == sess_id
-                        # Add the COVID 19 label
-                        labels_df.loc[sessions_mask, "Labels"] = labels_df[sessions_mask]["Labels"].apply(
-                            lambda l: l + ["COVID 19"])
-                        # Update the counter of samples changed
-                        sess_labels_fixed += sessions_mask.sum()
-                        break  # Don't look for more tests
-
+        sess_labels_fixed = relabel_with_covid_tests(posi_labels_df, args)
         print(f"Sessions with 'COVID 19' label added: {sess_labels_fixed}")
-
     else:
         print("Skipping the relabeling step")
 
@@ -160,13 +84,16 @@ def main(args):
     Filter samples of interest to create the final Dataset.
 
         1 - The selected samples to create the ECVL Dataset must have at least
-            one of the labels of interest (defined in args.target_labels)
+            one of the labels of interest. The labels in args.posi_target_labels
+            apply to the patients in the 'posi' dataset while the labels in
+            args.neg_target_labels apply to the patients in the 'neg' dataset.
 
         2 - The selected samples must be also anterior-posterior (AP) or
             posterior-anterior (PA) views
 
         3 - If the clean-data argument is provided. We only take the images
             that are labeled as "OK" in the TSV provided by the clean-data flag
+            Note: Only for posi patients
 
         4 - If the only-dx or only-cr (exclusive or) flag is enabled we have to
             select only the corresponding samples
@@ -177,36 +104,36 @@ def main(args):
 
     # 1 - Filter by labels
 
+    # Filter posi patients
     def filter_by_labels(df_row: pd.Series):
         """Returns True if at least one target label is in the row labels"""
-        return any(label in df_row["Labels"] for label in args.target_labels)
+        return any(label in df_row["Labels"] for label in args.posi_target_labels)
 
     # Get the rows of the DataFrame that have at least one of the target labels
-    samples_filter = labels_df.apply(filter_by_labels, axis=1)  # Rows mask
-    selected_labels = labels_df[samples_filter].copy()
+    samples_filter = posi_labels_df.apply(filter_by_labels, axis=1)  # Rows mask
+    posi_selected_labels = posi_labels_df[samples_filter].copy()
 
-    # Prepare a function to extract the label to classify each sample
-    #   Note: In the labels_df dataframe each sample has a list of labels
-    if args.multiclass:
-        # Auxiliary set to compute the intersection with the samples labels
-        target_labels_set = set(args.target_labels)
+    # Filter neg patients
+    def filter_by_labels(df_row: pd.Series):
+        """Returns True if at least one target label is in the row labels"""
+        return any(label in df_row["Labels"] for label in args.neg_target_labels)
 
-        def select_label(row_labels: pd.Series):
-            # Get the labels from the sample that are in target_labels list
-            row_labels_set = set(row_labels)
-            selected_lab = list(target_labels_set.intersection(row_labels_set))
-            if len(selected_lab) == 0:
-                raise Exception("Unexpected error. No target label found!")
-            return selected_lab
-    else:
-        def select_label(row_labels: pd.Series):
-            for label in args.target_labels:
-                if label in row_labels:
-                    return [label]  # Return the first match
-            raise Exception("Unexpected error. No target label found!")
+    # Get the rows of the DataFrame that have at least one of the target labels
+    samples_filter = neg_labels_df.apply(filter_by_labels, axis=1)  # Rows mask
+    neg_selected_labels = neg_labels_df[samples_filter].copy()
+
+    # Select the label that represents each session
+    def select_label(row_labels: pd.Series, target_labels: list):
+        for label in target_labels:
+            if label in row_labels:
+                return [label]  # Return the first match
+        raise Exception("Unexpected error. No target label found!")
 
     # Convert the lists of labels to a list with only the target label
-    selected_labels["Labels"] = selected_labels["Labels"].apply(select_label)
+    posi_selected_labels["Labels"] = posi_selected_labels["Labels"].apply(
+        lambda x: select_label(x, args.posi_target_labels))
+    neg_selected_labels["Labels"] = neg_selected_labels["Labels"].apply(
+        lambda x: select_label(x, args.neg_target_labels))
 
     # 2 - Filter by views (AP and PA)
     #   Note: We know the view by looking at the image file name
@@ -218,8 +145,10 @@ def main(args):
         return False
 
     # Get the rows of the DataFrame that are AP or PA images
-    samples_filter = part_df.apply(is_ap_or_pa, axis=1)  # Rows mask filter
-    selected_samples = part_df[samples_filter]
+    samples_filter = posi_df.apply(is_ap_or_pa, axis=1)  # Rows mask filter
+    posi_selected_samples = posi_df[samples_filter]
+    samples_filter = neg_df.apply(is_ap_or_pa, axis=1)  # Rows mask filter
+    neg_selected_samples = neg_df[samples_filter]
 
     # 3 - Get only the images that are manually validated
 
@@ -229,20 +158,23 @@ def main(args):
         # Take only the samples that are "OK"
         ok_samples = clean_df[clean_df["status"] == "OK"]
         # Create the filter to take the "OK" samples only
-        ok_filter = selected_samples["session"].isin(ok_samples["session"])
+        ok_filter = posi_selected_samples["session"].isin(ok_samples["session"])
         # Apply the filter
-        selected_samples = selected_samples[ok_filter]
+        posi_selected_samples = posi_selected_samples[ok_filter]
 
     # 4 - Get only the DX or CR images
 
     if args.only_dx != args.only_cr:
         # Select the target image type
         type_ = "dx" if args.only_dx else "cr"
+
+        def aux_func(row):
+            return type_ in row["filepath"]
         # Get the rows of the DataFrame that are from the selected type
-        samples_filter = selected_samples.apply(
-            lambda row: type_ in row["filepath"], axis=1)  # Rows mask filter
-        # Apply the filter
-        selected_samples = selected_samples[samples_filter]
+        samples_filter = posi_selected_samples.apply(aux_func, axis=1)
+        posi_selected_samples = posi_selected_samples[samples_filter]
+        samples_filter = neg_selected_samples.apply(aux_func, axis=1)
+        neg_selected_samples = neg_selected_samples[samples_filter]
     elif args.only_dx:  # Both are True
         raise Exception(
             "You can only enable one of the flags '--only-dx' or '--only-cr'")
@@ -263,11 +195,83 @@ def main(args):
                 sessions2avoid.append(ses_id[0])
 
         # Filter the samples dataframe
-        n_before = len(selected_samples.index)
-        rows2avoid_filter = selected_samples['session'].isin(sessions2avoid)
-        selected_samples = selected_samples[~rows2avoid_filter]
-        n_after = len(selected_samples.index)
-        print(f"Removed {n_before - n_after} samples")
+        # posi patients
+        n_before = len(posi_selected_samples.index)
+        rows2avoid_filter = posi_selected_samples['session'].isin(sessions2avoid)
+        posi_selected_samples = posi_selected_samples[~rows2avoid_filter]
+        n_after = len(posi_selected_samples.index)
+        n_removed = n_before - n_after
+        # neg patients
+        n_before = len(neg_selected_samples.index)
+        rows2avoid_filter = neg_selected_samples['session'].isin(sessions2avoid)
+        neg_selected_samples = neg_selected_samples[~rows2avoid_filter]
+        n_after = len(neg_selected_samples.index)
+        n_removed += n_before - n_after
+        print(f"Removed {n_removed} samples")
+
+    """
+    Merge the 'posi' and 'neg' dataframes now that we have done some specific
+    filtering on them so the next steps of the script are clearer.
+
+    We are also going to add some extra columns to simplify the processing
+    in the following steps of the script:
+
+        - full_path: Full path to access the images in order be able to
+                     preprocess them. We will add the path to the 'posi' or
+                     'neg' folders depending on the patient type of the image.
+
+        - orig_subject: The 'posi' and 'neg' sets of patients have some common
+                        patients but the subject ID is not the same in both sets.
+                        The dataset provides a file with the subjects IDs
+                        translation between sets. In this 'orig_subject' column
+                        we will store the original ID, and in the 'subject' column
+                        we will apply the translation following the file provided.
+
+        - patient_type: To mark each sample as 'posi' or 'neg' before the merge.
+    """
+    # Copy the full dataframes to avoid warnings from pandas for modifying a copy of a slice
+    posi_selected_samples = posi_selected_samples.copy()
+    neg_selected_samples = neg_selected_samples.copy()
+
+    # 1. Merge the selected samples
+
+    # 1.1 Add the column with the full paths to the posi samples dataframe
+    def posi_to_full_path(path: str) -> str:
+        return os.path.join(args.posi_path, path)
+    posi_selected_samples["full_path"] = posi_selected_samples['filepath'].apply(posi_to_full_path)
+
+    # 1.2 Add the column with the full paths to the neg samples dataframe
+    def neg_to_full_path(path: str) -> str:
+        full_path = os.path.join(args.neg_path, path)
+        # Add a "mod-rx" folder before the file name to match the real
+        # structure of the dataset
+        parts = full_path.split('/')
+        return '/'.join([*parts[:-1], "mod-rx", parts[-1]])
+    neg_selected_samples["full_path"] = neg_selected_samples['filepath'].apply(neg_to_full_path)
+
+    # 1.3 Add the columns with the original subject ID for each sample
+    posi_selected_samples["orig_subject"] = posi_selected_samples['subject']
+    neg_selected_samples["orig_subject"] = neg_selected_samples['subject']
+
+    # 1.4 Change the common subjects IDs in the 'neg' dataframe with the
+    #     corresponding ID in the 'posi' dataset
+    common_subs_df = pd.read_csv(args.common_ids, sep='\t')
+    neg_comm_subs = common_subs_df['covid19_neg'].values
+    posi_comm_subs = common_subs_df['covid19_posi'].values
+    neg_selected_samples['subject'] = neg_selected_samples['subject'].replace(neg_comm_subs, posi_comm_subs)
+
+    # 1.5 Add the 'patient_type' column
+    posi_selected_samples['patient_type'] = 'posi'
+    neg_selected_samples['patient_type'] = 'neg'
+
+    # 1.6 Concat the 'posi' and 'neg' dataframes
+    selected_samples = pd.concat([posi_selected_samples, neg_selected_samples],
+                                 ignore_index=True)
+
+    # Merge the selected labels
+    # posi_selected_labels, neg_selected_labels
+    selected_labels = pd.concat([posi_selected_labels, neg_selected_labels],
+                                 ignore_index=True)
 
     """
     Create the DataFrame with all the relevant info for each sample.
@@ -288,7 +292,8 @@ def main(args):
                                     'age'])
 
     # Prepare the folder to store the preprocessed images
-    os.makedirs(os.path.join(args.sub_path, preproc_dirname), exist_ok=True)
+    preproc_dirname = f"{args.yaml_name}_preproc_data"
+    os.makedirs(os.path.join(args.preproc_path, preproc_dirname), exist_ok=True)
 
     # We store the pairs of images paths (orig, dest) of the images that we are
     # going to preprocess. We do this to execute the preprocessing in parallel
@@ -309,8 +314,6 @@ def main(args):
 
         # Get the list of target labels ("COVID 19", "normal",...)
         row_labels = row_labels["Labels"].values[0]
-        # Get the path to the original image
-        orig_img_path = os.path.join(args.sub_path, row['filepath'])
 
         if not args.avoid_preproc:
             # This path must be relative to the folder of the output YAML
@@ -318,21 +321,24 @@ def main(args):
 
             # Add the image to the preprocessing queue with the input and output
             # paths for the preprocessing function
-            new_img_path = os.path.join(args.sub_path, new_img_relpath)
+            new_img_path = os.path.join(args.preproc_path, new_img_relpath)
 
             # Add the image to the preprocessing queue
             if not os.path.isfile(new_img_path) or args.new_preproc:
                 # See preprocess_image() args
                 extra_args = ("adaptive", True,
                               args.to_rgb, args.colormap, args.n_colors)
-                images_to_preprocess.append((orig_img_path,
+                images_to_preprocess.append((row['full_path'],
                                              new_img_path,
                                              *extra_args))
         else:
             new_img_relpath = row['filepath']  # Use the original image
 
         # Get subject data (age, gender...)
-        sub_data = subjects_df[subjects_df["participant"] == sub_id]
+        if row['patient_type'] == 'posi':
+            sub_data = posi_sub_df[posi_sub_df["participant"] == row['orig_subject']]
+        else:  # is 'neg'
+            sub_data = neg_sub_df[neg_sub_df["participant"] == row['orig_subject']]
         assert len(sub_data.index) == 1  # Sanity check
         sub_gender = sub_data["gender"].values[0]  # Get the str ('M' or 'F')
         sub_age = ast.literal_eval(sub_data["age"].values[0])[0]  # Get the int
@@ -366,6 +372,8 @@ def main(args):
     Create the splits (training, validation, test).
         Note: The splits are made at subject level.
     """
+    # Combine all the labels in one list
+    all_target_labels = list(set(args.posi_target_labels + args.neg_target_labels))
 
     if not args.avoid_balancing:
         print("\nGoing to create the balanced validation and test partitions")
@@ -373,13 +381,13 @@ def main(args):
         Prepare the data structure to balance the data splits
         """
         data_by_sub = main_df.groupby("subject")
-        label2idx = {label: i for i, label in enumerate(args.target_labels)}
+        label2idx = {label: i for i, label in enumerate(all_target_labels)}
         # To collect the data for balancing the splits. A list per target label
-        subs_labels = [[] for _ in range(len(args.target_labels))]
+        subs_labels = [[] for _ in range(len(all_target_labels))]
 
         for sub_id, sub_sessions in data_by_sub:
             # Count the number of sessions for each label
-            sub_labels_counter = np.array([0] * len(args.target_labels))
+            sub_labels_counter = np.array([0] * len(all_target_labels))
             for idx, sess in sub_sessions.iterrows():
                 for label in sess["labels"]:
                     sub_labels_counter[label2idx[label]] += 1
@@ -406,14 +414,14 @@ def main(args):
         # Fill the validation split
         val_subjects = []
         n_val_samples = 0
-        val_labels = np.array([0] * len(args.target_labels))
+        val_labels = np.array([0] * len(all_target_labels))
         min_label = 0
         while n_val_samples < n_val:
             # Take a subject to add samples to the current minimum label
             try:
                 sub_id, labels = subs_labels[min_label].pop()
             except IndexError as err:
-                label_name = args.target_labels[min_label]
+                label_name = all_target_labels[min_label]
                 my_err = Exception(("The are not enought samples of the "
                                     f"class {label_name} to create a "
                                     " balanced validation split"))
@@ -430,14 +438,14 @@ def main(args):
         # Fill the test split
         test_subjects = []
         n_test_samples = 0
-        test_labels = np.array([0] * len(args.target_labels))
+        test_labels = np.array([0] * len(all_target_labels))
         min_label = 0
         while n_test_samples < n_test:
             # Take a subject to add samples to the current minimum label
             try:
                 sub_id, labels = subs_labels[min_label].pop()
             except IndexError as err:
-                label_name = args.target_labels[min_label]
+                label_name = all_target_labels[min_label]
                 my_err = Exception(("The are not enought samples of the "
                                     f"class {label_name} to create a "
                                     "balanced test split"))
@@ -454,7 +462,7 @@ def main(args):
 
         # Put the rest of the samples into the train split
         train_subjects = []
-        train_labels = np.array([0] * len(args.target_labels))
+        train_labels = np.array([0] * len(all_target_labels))
         for subs_l in subs_labels:
             for sub_id, labels in subs_l:
                 # Add the subject to the training split
@@ -468,21 +476,21 @@ def main(args):
         print(f"  + number of samples: {n_train_samples}")
         print("  + labels distribution:")
         for i, count in enumerate(train_labels):
-            print(f"    - {args.target_labels[i]}: {count}")
+            print(f"    - {all_target_labels[i]}: {count}")
         print(f"  + number of subjects: {len(train_subjects)}")
 
         print("\nValidation split:")
         print(f"  + number of samples: {n_val_samples}")
         print("  + labels distribution:")
         for i, count in enumerate(val_labels):
-            print(f"    - {args.target_labels[i]}: {count}")
+            print(f"    - {all_target_labels[i]}: {count}")
         print(f"  + number of subjects: {len(val_subjects)}")
 
         print("\nTest split:")
         print(f"  + number of samples: {n_test_samples}")
         print("  + labels distribution:")
         for i, count in enumerate(test_labels):
-            print(f"    - {args.target_labels[i]}: {count}")
+            print(f"    - {all_target_labels[i]}: {count}")
         print(f"  + number of subjects: {len(test_subjects)}")
 
     else:  # args.avoid_balancing is True
@@ -541,9 +549,9 @@ def main(args):
             # Get the index and number of samples of the majority label
             max_label = np.argmax(train_labels)
             n_max_label = train_labels[max_label]
-            print((f" - The majority class is {args.target_labels[max_label]} "
+            print((f" - The majority class is {all_target_labels[max_label]} "
                    f"with {n_max_label} samples"))
-            for label_idx, label in enumerate(args.target_labels):
+            for label_idx, label in enumerate(all_target_labels):
                 if label_idx == max_label:
                     continue  # We dont't have to replicate any sample
 
@@ -585,9 +593,9 @@ def main(args):
                             new_path = orig_path[:-4] + f"_DA-{copy_idx}.png"
 
                             # Create the paths for creating the copies
-                            orig_img_path = os.path.join(args.sub_path,
+                            orig_img_path = os.path.join(args.preproc_path,
                                                          orig_path)
-                            new_img_path = os.path.join(args.sub_path,
+                            new_img_path = os.path.join(args.preproc_path,
                                                         new_path)
 
                             # Add the sample to the data augmentaion queue
@@ -623,9 +631,9 @@ def main(args):
                             new_path = orig_path[:-4] + f"_DA-{copy_idx}.png"
 
                             # Create the paths for creating the copies
-                            orig_img_path = os.path.join(args.sub_path,
+                            orig_img_path = os.path.join(args.preproc_path,
                                                          orig_path)
-                            new_img_path = os.path.join(args.sub_path,
+                            new_img_path = os.path.join(args.preproc_path,
                                                         new_path)
 
                             # Add the sample to the data augmentaion queue
@@ -673,7 +681,7 @@ def main(args):
     print(f"Test split samples: {n_te_samples}")
 
     # Store the new main DataFrame to a TSV
-    main_df_outfile = os.path.join(args.sub_path, f"{args.yaml_name}.tsv")
+    main_df_outfile = os.path.join(args.preproc_path, f"{args.yaml_name}.tsv")
     main_df.to_csv(main_df_outfile, sep='\t', index=False)
     print(f'\nStored splits data in "{main_df_outfile}"')
 
@@ -682,13 +690,12 @@ def main(args):
     created with all the informaton about the samples.
     """
 
-    yaml_outfile = os.path.join(args.sub_path, f"{args.yaml_name}.yaml")
-    stats_dict = create_ecvl_yaml(
-        main_df, yaml_outfile, args.target_labels, args.multiclass)
+    yaml_outfile = os.path.join(args.preproc_path, f"{args.yaml_name}.yaml")
+    stats_dict = create_ecvl_yaml(main_df, yaml_outfile, all_target_labels)
     print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
 
     # Store the script config
-    config_outfile = os.path.join(args.sub_path, f"{args.yaml_name}_args.json")
+    config_outfile = os.path.join(args.preproc_path, f"{args.yaml_name}_args.json")
     with open(config_outfile, 'w') as fstream:
         json.dump(vars(args), fstream, indent=4, sort_keys=True)
     print(f'\nStored the dataset config in "{config_outfile}"')
@@ -706,14 +713,24 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     arg_parser.add_argument(
-        "--sub-path",
-        help="Path to the directory with the subjects data folders",
+        "--posi-path",
+        help="Path to the directory with the data of the positive patients",
         default="../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/")
 
     arg_parser.add_argument(
+        "--neg-path",
+        help="Path to the directory with the data of the negative patients",
+        default="../../../datasets/BIMCV-COVID19-cIter_1_2-Negative/covid19_neg/")
+
+    arg_parser.add_argument(
+        "--common-ids",
+        help="Path to the TSV with the subjects ID equivalence between the 'posi' and 'neg' datasets",
+        default="../../../datasets/BIMCV-COVID19-cIter_1_2-Negative/listjoin_ok.tsv")
+
+    arg_parser.add_argument(
         "--clean-data",
-        help=("Path to the TSV file with the annotations generated wit the "
-              "data_cleaning.ipynb notebook"),
+        help=("Path to the TSV file with the annotations generated with the "
+              "data_cleaning.ipynb notebook to take the manually selected samples"),
         default=None)
 
     arg_parser.add_argument(
@@ -763,20 +780,24 @@ if __name__ == "__main__":
         type=int)
 
     arg_parser.add_argument(
-        "--target-labels",
-        help=("Target labels to select the samples for training. "
+        "--posi-target-labels",
+        help=("Target labels to select the samples from the positive patients. "
               "The order is important, the first matching label will be taken "
               "as the label for the sample."),
         metavar="label_name",
         nargs='+',
-        default=["normal", "COVID 19", "pneumonia", "infiltrates"],
+        default=["COVID 19"],
         type=str)
 
     arg_parser.add_argument(
-        "--multiclass",
-        help=("To create multiclass labels instead of taking one label from "
-              "each sample"),
-        action="store_true")
+        "--neg-target-labels",
+        help=("Target labels to select the samples from the negative patients. "
+              "The order is important, the first matching label will be taken "
+              "as the label for the sample."),
+        metavar="label_name",
+        nargs='+',
+        default=["normal"],
+        type=str)
 
     arg_parser.add_argument(
         "--splits",
@@ -812,10 +833,16 @@ if __name__ == "__main__":
         type=str)
 
     arg_parser.add_argument(
+        "--preproc-path",
+        help="Path to the folder to store the preprocessed dataset",
+        default="../../../datasets/preproc_BIMCV-COVID19",
+        type=str)
+
+    arg_parser.add_argument(
         "--yaml-name",
         help=("Name of the YAML file to create (without the file extension). "
               "This name is also used to create the folder for the "
-              "preprocessed data ('{YAML_NAME}_preproc_data')"),
+              "preprocessed images ('{YAML_NAME}_preproc_data')"),
         default="ecvl_bimcv_covid19",
         type=str)
 
