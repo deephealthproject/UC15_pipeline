@@ -65,14 +65,15 @@ In order to compare the results and performance of the EDDL, another version of 
 ## 1. Prepare the data
 
 Regardless of the pipeline version to be run (EDDL C++, PyEDDL or Pytorch), the *prepare_ecvl_dataset.py* must be executed to prepare the YAML file that the ECVL needs to load the data or the CSV file that the Pytorch version needs.
+With the *prepare_ecvl_dataset.py* script you can modify the labels that you are goin to select for training and some other configurations for the data (use the *--help* flag to see all the options available).
 
 To execute this script go to the *pyeddl_pipeline* folder and execute the script with the arguments configuration that you need. For example:
 
 ```bash
 cd pyeddl_pipeline  # Needed to find some imports of the script
-python prepare_ecvl_dataset.py --sub-path <PATH_TO_DATASET>/covid19_posi --target-labels 'normal' 'COVID 19'
+python prepare_ecvl_dataset.py --posi-path <PATH_TO_DATASET>/covid19_posi --neg-path <PATH_TO_DATASET>/covid19_neg --common-ids <PATH_TO_DATASET>/listjoin_ok.tsv
 ```
-Note: *<PATH_TO_DATASET>* is the path to the folder where you decompressed the dataset with the script *decompress_dataset.sh*. And with the *--target-labels* flag we created a dataset to classify between two classes: *normal* and *COVID 19*. Check all the configuration possibilities and defaults using the *--help* flag.
+Note: *<PATH_TO_DATASET>* is the path to the folder where you decompressed the dataset with the script *decompress_dataset.sh*.
 
 ## 2. Train
 
