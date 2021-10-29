@@ -11,6 +11,7 @@ import nibabel as nib
 from skimage import exposure
 import albumentations as A
 from matplotlib import pyplot as plt
+import cv2
 
 
 def png2numpy(png_path: str) -> np.ndarray:
@@ -23,8 +24,7 @@ def png2numpy(png_path: str) -> np.ndarray:
     Returns:
         A numpy array with the image.
     """
-    pil_img = Image.open(png_path)
-    return np.array(pil_img)
+    return cv2.imread(png_path, cv2.IMREAD_UNCHANGED)
 
 
 def nifty2numpy(nifti_path: str) -> np.ndarray:
@@ -105,7 +105,7 @@ def preprocess_image(img_path: str,
     """
     Applies histogram equalization to the image given and stores the
     preprocessed version in the provided output path. Other transformations
-    can be applied if activated: invert grayscale colors or convert to RGB
+    can be applied if activated: invert grayscale colors and convert to RGB
     with a colormap from matplotlib.
 
     Args:
@@ -143,23 +143,21 @@ def preprocess_image(img_path: str,
     else:
         raise Exception("Wrong histogram equalization type provided!")
 
+    # After histogram equalization the values are floats in the
+    # range [0-1]. So we convert the images to the range [0-255]
+    img = img * 255.0
+
     if to_rgb:
         # Apply colorization. Te output is RGBA (H, W, 4)
         img = to_rgba_with_cmap(img, colormap, n_colors)
+        # Convert from RGBA to RGB
+        img = Image.fromarray(img, mode='RGBA')
+        img = img.convert('RGB')
 
-    # After histogram equalization the values are floats in the range [0-1].
-    # Convert the images to the range [0-255] with uint8 values
-    img = np.uint8(img * 255.0)
-
-    # From numpy to PIL image
-    if to_rgb:
-        pil_img = Image.fromarray(img, mode='RGBA')
-        pil_img = pil_img.convert('RGB')
-    else:
-        pil_img = Image.fromarray(img, mode='L')
+    img = np.uint8(img)
 
     # Store the processed image
-    pil_img.save(img_outpath, format="PNG")
+    cv2.imwrite(img_outpath, img)
 
 
 def create_copy_with_DA(img_path: str,

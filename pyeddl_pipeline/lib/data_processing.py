@@ -144,7 +144,8 @@ def relabel_with_covid_tests(posi_labels_df: pd.DataFrame, args) -> int:
 
 def create_ecvl_yaml(df: pd.DataFrame,
                      yaml_path: str,
-                     target_labels: list) -> dict:
+                     target_labels: list,
+                     multiclass: bool) -> dict:
     """
     Given a DataFrame with all the necessary data to create a training dataset,
     this function creates a YAML file to be able to create the corresponding
@@ -159,6 +160,9 @@ def create_ecvl_yaml(df: pd.DataFrame,
         target_labels: A list with the labels to use for classification. The
                        order is important, the first matching label will be
                        taken as the label for the sample.
+
+        multiclass: If True, instead of taking just the first matching label
+                    for each sample, all the matching labels will be taken.
 
     Returns:
         A dictionary with the counts of the samples by label.
@@ -190,10 +194,11 @@ def create_ecvl_yaml(df: pd.DataFrame,
     counts_dict = {}  # Counts by label to return at the end
 
     for sample_idx, (_, row) in enumerate(df.iterrows()):
-        assert len(row["labels"]) > 0  # Sanity check
-
         # Update the classes counter
-        label_name = row["labels"][0]
+        if multiclass:
+            label_name = " + ".join(sorted(row["labels"]))
+        else:
+            label_name = row["labels"][0]
         counts_dict[label_name] = counts_dict.get(label_name, 0) + 1
 
         # Store the sample data

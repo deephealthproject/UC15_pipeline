@@ -9,7 +9,8 @@ from datetime import datetime
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 
-from lib.training import get_augmentations, get_optimizer, train, test
+from lib.training import get_augmentations, get_optimizer, apply_regularization
+from lib.training import train, test
 from lib.models import get_model, get_model_tl
 from lib.plot_utils import plot_training_results
 
@@ -28,7 +29,9 @@ def main(args):
     dataset = ecvl.DLDataset(args.yaml_path,
                              args.batch_size,
                              splits_augs,
-                             color_type)
+                             color_type,
+                             num_workers=args.datagen_workers,
+                             queue_ratio_size=args.queue_ratio_size)
 
     # Data info
     in_shape = (dataset.n_channels_, *args.target_size)
@@ -38,9 +41,11 @@ def main(args):
     # Get the full dataset configuration to log it in the experiment logs
     dataset_config_file = args.yaml_path[:-5] + "_args.json"
     if not os.path.isfile(dataset_config_file):
-        raise Exception(f"Dataset config '{dataset_config_file}' not found!")
-    with open(dataset_config_file) as fstream:
-        args.dataset_config = json.load(fstream)
+        print(f"Dataset config '{dataset_config_file}' not found!")
+        args.dataset_config = {}
+    else:
+        with open(dataset_config_file) as fstream:
+            args.dataset_config = json.load(fstream)
 
     #################
     # Prepare Model #
@@ -61,7 +66,12 @@ def main(args):
         # Create a new model
         model, args.init_weights, args.layers2init = get_model(args.model,
                                                                in_shape,
-                                                               num_classes)
+                                                               num_classes,
+                                                               args.multiclass)
+
+    if args.regularization:
+        print(f"Going to apply {args.regularization} regularization to the model")
+        apply_regularization(model, args.regularization, args.regularization_factor)
 
     # Create the optimizer
     opt = get_optimizer(args.optimizer, args.learning_rate)
@@ -75,7 +85,7 @@ def main(args):
     # Build the model
     eddl.build(model,
                opt,
-               ["softmax_cross_entropy"],
+               ["mse"] if args.multiclass else ["softmax_cross_entropy"],
                ['accuracy'],
                comp_serv,
                args.init_weights)
@@ -219,7 +229,7 @@ if __name__ == "__main__":
         "--augmentations", "-augs",
         help="Set of augmentations to select",
         default="0.0",
-        choices=["0.0", "1.0", "1.1"],
+        choices=["0.0", "1.0", "1.1", "2.0"],
         type=str)
 
     arg_parser.add_argument(
@@ -237,7 +247,27 @@ if __name__ == "__main__":
                  "Pretrained_ResNet18", "Pretrained_ResNet34",
                  "Pretrained_ResNet50", "Pretrained_ResNet101",
                  "Pretrained_ResNet152",
-                 "Pretrained_VGG16", "Pretrained_VGG19BN"])
+                 "Pretrained_VGG16", "Pretrained_VGG19",
+                 "Pretrained_VGG16BN", "Pretrained_VGG19BN"])
+
+    arg_parser.add_argument(
+        "--multiclass",
+        help=("Prepares the pipeline for multiclass classification, "
+              "using sigmoid in the output layer"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--regularization", "-reg",
+        help="Adds the selected regularization type to all the layers of the model",
+        default=None,
+        choices=["l1", "l2", "l1l2"],
+        type=str)
+
+    arg_parser.add_argument(
+        "--regularization-factor", "-reg-f",
+        help="Regularization factor to use (in case of using --regularization)",
+        default=0.01,
+        type=float)
 
     arg_parser.add_argument(
         "--optimizer", "-opt",
@@ -296,5 +326,18 @@ if __name__ == "__main__":
               "densely connected block to classify. IMPORTANT: Provide the "
               "corresponding model architecture with the --model flag."),
         type=str)
+
+    arg_parser.add_argument(
+        "--datagen-workers",
+        help="Number of worker threads to use for loading the batches",
+        default=1,
+        type=int)
+
+    arg_parser.add_argument(
+        "--queue-ratio-size",
+        help=("The producers-consumer queue of the data generator will have a "
+              "maximum size equal to batch_size x queue_ratio_size x datagen_workers"),
+        default=1,
+        type=int)
 
     main(arg_parser.parse_args())

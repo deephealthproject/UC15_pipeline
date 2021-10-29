@@ -122,12 +122,30 @@ def main(args):
     samples_filter = neg_labels_df.apply(filter_by_labels, axis=1)  # Rows mask
     neg_selected_labels = neg_labels_df[samples_filter].copy()
 
-    # Select the label that represents each session
-    def select_label(row_labels: pd.Series, target_labels: list):
-        for label in target_labels:
-            if label in row_labels:
-                return [label]  # Return the first match
-        raise Exception("Unexpected error. No target label found!")
+    # Prepare a function to extract the label or labels to classify each sample
+    if args.multiclass:
+        # Select the list of labels that represents each session
+        def select_label(row_labels: pd.Series, target_labels: list):
+            # Auxiliary sets to compute the intersection with the samples labels
+            target_labels_set = set(target_labels)
+            row_labels_set = set(row_labels)
+
+            # Get the labels from the sample that are in target_labels list
+            selected_lab = list(target_labels_set.intersection(row_labels_set))
+            if len(selected_lab) == 0:
+                raise Exception("Unexpected error. No target label found!")
+            return sorted(selected_lab)
+    else:
+        # Select the label that represents each session
+        def select_label(row_labels: pd.Series, target_labels: list):
+            if len(row_labels) == 1 and row_labels[0] == "":
+                return ["normal"]
+
+            for label in target_labels:
+                if label in row_labels:
+                    return [label]  # Return the first match
+
+            raise Exception("Unexpected error. No target label found!")
 
     # Convert the lists of labels to a list with only the target label
     posi_selected_labels["Labels"] = posi_selected_labels["Labels"].apply(
@@ -299,6 +317,10 @@ def main(args):
     # going to preprocess. We do this to execute the preprocessing in parallel
     images_to_preprocess = []
 
+    if not args.avoid_preproc:
+        run_regex = re.compile(r'run-\d+')
+        acq_regex = re.compile(r'acq-\d+')
+
     # Iterate over each sample to collect the data to create the new "main_df"
     print("\nCollecting samples data:")
     n_selected = len(selected_samples.index)
@@ -316,8 +338,17 @@ def main(args):
         row_labels = row_labels["Labels"].values[0]
 
         if not args.avoid_preproc:
+            # Get the run and acq number
+            run_number = run_regex.findall(row['filepath'])
+            acq_number = acq_regex.findall(row['filepath'])
+            assert len(run_number) == 1  # Only one match should be present
+            assert len(acq_number) <= 1   # The acq number may not be present
+
             # This path must be relative to the folder of the output YAML
-            new_img_relpath = f"{preproc_dirname}/{sub_id}_{sess_id}_img.png"
+            if len(acq_number) > 0:
+                new_img_relpath = f"{preproc_dirname}/{sub_id}_{sess_id}_{run_number[0]}_{acq_number[0]}.png"
+            else:
+                new_img_relpath = f"{preproc_dirname}/{sub_id}_{sess_id}_{run_number[0]}.png"
 
             # Add the image to the preprocessing queue with the input and output
             # paths for the preprocessing function
@@ -326,8 +357,7 @@ def main(args):
             # Add the image to the preprocessing queue
             if not os.path.isfile(new_img_path) or args.new_preproc:
                 # See preprocess_image() args
-                extra_args = ("adaptive", True,
-                              args.to_rgb, args.colormap, args.n_colors)
+                extra_args = ("adaptive", True, args.to_rgb, args.colormap, args.n_colors)
                 images_to_preprocess.append((row['full_path'],
                                              new_img_path,
                                              *extra_args))
@@ -691,7 +721,7 @@ def main(args):
     """
 
     yaml_outfile = os.path.join(args.preproc_path, f"{args.yaml_name}.yaml")
-    stats_dict = create_ecvl_yaml(main_df, yaml_outfile, all_target_labels)
+    stats_dict = create_ecvl_yaml(main_df, yaml_outfile, all_target_labels, args.multiclass)
     print(f'\nStored ECVL datset YAML in "{yaml_outfile}"')
 
     # Store the script config
@@ -798,6 +828,12 @@ if __name__ == "__main__":
         nargs='+',
         default=["normal"],
         type=str)
+
+    arg_parser.add_argument(
+        "--multiclass",
+        help=("To create multiclass labels instead of taking one label from "
+              "each sample"),
+        action="store_true")
 
     arg_parser.add_argument(
         "--splits",

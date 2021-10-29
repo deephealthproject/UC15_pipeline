@@ -20,6 +20,36 @@ from pyeddl.tensor import Tensor
 #####################
 
 
+def augmentations_v2_0(size: tuple) -> ecvl.DatasetAugmentations:
+    """
+    Returns the v2.0 augmentations for each split (train, val, test).
+    The v2.0 applies the same augmentations types than the v1.X and adds
+    optical distorsion.
+    """
+    tr_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugOpticalDistortion([-0.2, -0.2], [-0.2, -0.2],
+                                  interp=ecvl.InterpolationType.cubic),
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugMirror(p=0.5),
+        ecvl.AugRotate([-15, 15]),
+        ecvl.AugBrightness([0, 70]),
+        ecvl.AugGammaContrast([0.6, 1.4]),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    val_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    te_augs = ecvl.SequentialAugmentationContainer([
+        ecvl.AugResizeDim(size, ecvl.InterpolationType.cubic),
+        ecvl.AugToFloat32(255.0)
+    ])
+
+    return ecvl.DatasetAugmentations([tr_augs, val_augs, te_augs])
+
+
 def augmentations_v1_0(size: tuple) -> ecvl.DatasetAugmentations:
     """
     Returns the v1.0 augmentations for each split (train, val, test).
@@ -119,8 +149,43 @@ def get_augmentations(version: str, size: tuple) -> ecvl.DatasetAugmentations:
         return augmentations_v1_0(size)
     if version == "1.1":
         return augmentations_v1_1(size)
+    if version == "2.0":
+        return augmentations_v2_0(size)
 
     raise Exception("Wrong augmentations version provided!")
+
+
+##################
+# Regularization #
+##################
+
+
+def apply_regularization(model: eddl.Model,
+                         regularization: str,
+                         factor: float):
+    """
+    Applies regularization to all the layers of the model.
+
+    Args:
+        model: Model to apply the regularization.
+
+        regularization: Name of the regularization type to apply.
+
+        factor: Regularization factor to use.
+    """
+    # Get the regularization function to apply
+    if regularization == "l1":
+        reg_func = lambda l: eddl.L1(l, factor)
+    elif regularization == "l2":
+        reg_func = lambda l: eddl.L2(l, factor)
+    elif regularization == "l1l2":
+        reg_func = lambda l: eddl.L1L2(l, factor, factor)
+    else:
+        raise Exception(f"The regularization type provided '{regularization}' is not valid!")
+
+    # Set the regularization for each layer of the model
+    for layer in model.layers:
+        reg_func(layer)
 
 
 ##############
@@ -202,10 +267,6 @@ def train(model: eddl.Model,
     n_val_samples = len(dataset.GetSplit(ecvl.SplitType.validation))
     n_val_batches = n_val_samples // args.batch_size
 
-    # Create auxiliary tensors to load the data
-    x = Tensor([args.batch_size, *args.in_shape])  # Images
-    y = Tensor([args.batch_size, args.num_classes])  # Labels
-
     # To store and return the training results
     metrics_names = ["loss", "acc", "val_loss", "val_acc"]
     history = {metric: [] for metric in metrics_names}
@@ -246,8 +307,8 @@ def train(model: eddl.Model,
 
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.training)
-        shuffle_training_split(dataset)
-        dataset.ResetAllBatches()
+        dataset.ResetAllBatches(shuffle=True)
+        dataset.Start()  # Spawn workers
 
         eddl.reset_loss(model)
 
@@ -258,7 +319,7 @@ def train(model: eddl.Model,
         for batch in pbar:
             # Load batch of data
             load_start = time.perf_counter()
-            dataset.LoadBatch(x, y)
+            vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
             # Perform training with batch: forward and backward
@@ -273,11 +334,14 @@ def train(model: eddl.Model,
             pbar.set_description(
                 f"Training[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                              "batches_queue": f"{dataset.GetQueueSize()}",
                               "avg_train_time": f"{train_time / batch:.3f}s"})
 
         # Save the epoch results of the train split
         history["loss"].append(losses[0])
         history["acc"].append(metrics[0])
+
+        dataset.Stop()  # Join worker threads
 
         ####################
         # Validation phase #
@@ -285,6 +349,7 @@ def train(model: eddl.Model,
 
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.validation)
+        dataset.Start()  # Spawn workers
 
         eddl.reset_loss(model)
 
@@ -295,7 +360,7 @@ def train(model: eddl.Model,
         for batch in pbar:
             # Load batch of data
             load_start = time.perf_counter()
-            dataset.LoadBatch(x, y)
+            vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
             # Perform forward computations
@@ -310,6 +375,7 @@ def train(model: eddl.Model,
             pbar.set_description(
                 f"Validation[val_loss={losses[0]:.4f}, val_acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                              "batches_queue": f"{dataset.GetQueueSize()}",
                               "avg_eval_time": f"{eval_time / batch:.3f}s"})
 
         # Save the epoch results of the validation split
@@ -359,13 +425,15 @@ def train(model: eddl.Model,
         results_df = results_df.append(epoch_res, ignore_index=True)
         results_df.to_csv(results_csv_path, index=False)
 
+        dataset.Stop()  # Join worker threads
+
     return history
 
 
 def test(model: eddl.Model,
          dataset: ecvl.DLDataset,
          args: argparse.Namespace,
-         out_filename: str = "test_res.json") -> list:
+         out_filename: str = "test_res.json") -> dict:
     """
     Performs the model evaluation with the test split.
 
@@ -391,16 +459,13 @@ def test(model: eddl.Model,
     n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
     n_test_batches = n_test_samples // args.batch_size
 
-    # Create auxiliary tensors to load the data
-    x = Tensor([args.batch_size, *args.in_shape])  # Images
-    y = Tensor([args.batch_size, args.num_classes])  # Labels
-
     # To store and return the testing results
     history = {"loss": -1, "acc": -1}
 
     # Prepare dataset
     dataset.SetSplit(ecvl.SplitType.test)
     dataset.ResetAllBatches()
+    dataset.Start()  # Spawn workers
 
     eddl.reset_loss(model)
 
@@ -415,7 +480,7 @@ def test(model: eddl.Model,
     for batch in pbar:
         # Load batch of data
         load_start = time.perf_counter()
-        dataset.LoadBatch(x, y)
+        vsamples, x, y = dataset.GetBatch()
         load_end = time.perf_counter()
         load_time += load_end - load_start
         # Perform forward computations
@@ -425,8 +490,12 @@ def test(model: eddl.Model,
         test_time += test_end - test_start
         # Store the predictions to compute statistics later
         batch_logits = eddl.getOutput(eddl.getOut(model)[0]).getdata()
-        batch_preds = np.argmax(batch_logits, axis=1)
-        batch_targets = np.argmax(y.getdata(), axis=1)
+        if args.multiclass:
+            batch_preds = np.where(batch_logits > 0.5, 1, 0)
+            batch_targets = y.getdata()
+        else:
+            batch_preds = np.argmax(batch_logits, axis=1)
+            batch_targets = np.argmax(y.getdata(), axis=1)
         if preds is None:
             preds = batch_preds
             targets = batch_targets
@@ -440,7 +509,10 @@ def test(model: eddl.Model,
         pbar.set_description(
             f"Test[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
         pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
+                          "batches_queue": f"{dataset.GetQueueSize()}",
                           "avg_test_time": f"{test_time / batch:.3f}s"})
+
+    dataset.Stop()  # Join worker threads
 
     # Compute a report with statistics for each target class
     report = classification_report(targets,
