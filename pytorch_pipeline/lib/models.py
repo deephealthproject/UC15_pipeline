@@ -8,7 +8,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.optim import Adam, SGD
 import pytorch_lightning as pl
-from pytorch_lightning.metrics.functional import accuracy
+from torchmetrics import Accuracy
 
 
 ##########
@@ -355,6 +355,8 @@ class ResNet(pl.LightningModule):
         self.optimizer = optimizer
         self.learning_rate = learning_rate
 
+        self.metric = Accuracy()
+
         self.entry_block = nn.Sequential(
             ConvBNReLU(in_shape[0],
                        64,
@@ -410,7 +412,7 @@ class ResNet(pl.LightningModule):
 
         # Compute loss and metrics
         loss = F.cross_entropy(logits, y)
-        acc = accuracy(logits, y)
+        acc = self.metric(logits, y)
 
         self.log('train_loss', loss, prog_bar=True, logger=True)
         self.log('train_acc', acc, prog_bar=True, logger=True)
@@ -425,7 +427,7 @@ class ResNet(pl.LightningModule):
 
         # Compute loss and metrics
         loss = F.cross_entropy(logits, y)
-        acc = accuracy(logits, y)
+        acc = self.metric(logits, y)
 
         self.log('val_loss', loss, prog_bar=True, logger=True)
         self.log('val_acc', acc, prog_bar=True, logger=True)
@@ -438,7 +440,7 @@ class ResNet(pl.LightningModule):
 
         # Compute loss and metrics
         loss = F.cross_entropy(logits, y)
-        acc = accuracy(logits, y)
+        acc = self.metric(logits, y)
 
         self.log('test_loss', loss, prog_bar=True, logger=True)
         self.log('test_acc', acc, prog_bar=True, logger=True)
