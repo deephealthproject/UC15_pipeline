@@ -305,6 +305,11 @@ def train(model: eddl.Model,
                     eddl.setTrainable(model, layer_name, True)
                 avoid_unfreeze = True
 
+        # Update learning rate
+        new_lr = args.learning_rate * (1 / (1 + args.lr_decay * (epoch-1)))
+        eddl.setlr(model, [new_lr])
+        print(f"Current learning rate: {new_lr}")
+
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.training)
         dataset.ResetAllBatches(shuffle=True)

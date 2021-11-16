@@ -283,6 +283,12 @@ if __name__ == "__main__":
         type=float)
 
     arg_parser.add_argument(
+        "--lr-decay",
+        help="Value to regulate the learning rate decay",
+        default=0.0,
+        type=float)
+
+    arg_parser.add_argument(
         "--cpu",
         help="Sets CPU as the computing device",
         action="store_true")
