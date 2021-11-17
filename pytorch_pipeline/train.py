@@ -17,27 +17,6 @@ from lib.models import get_model
 def main(args):
     seed_everything(args.seed, workers=True)  # For reproducibility
 
-    # Create the object to handle the data loading
-    data_module = COVIDDataModule(args.data_tsv,
-                                  args.labels,
-                                  args.batch_size,
-                                  shuffle=True,
-                                  target_size=args.target_size,
-                                  augmentations=args.augmentations,
-                                  num_workers=args.num_workers,
-                                  pin_memory=True)
-
-    # Create the model
-    model = get_model(args.model,
-                      (1, *args.target_size),  # Input shape
-                      len(args.labels),  # Number of classes
-                      args)
-
-    # Prepare training callbacks
-    ckpt_callback = ModelCheckpoint(dirpath=args.models_ckpts,
-                                    monitor="val_loss",
-                                    save_top_k=1)
-
     # Experiment name
     exp_strftime = datetime.now().strftime("%d-%b_%H:%M")
     exp_name = (f"{exp_strftime}"
@@ -47,9 +26,35 @@ def main(args):
                 f"_opt-{args.optimizer}"
                 f"_lr-{args.learning_rate}")
 
+    # Prepare the folder to store the experiment results
+    exp_path = os.path.join(args.logs, exp_name)
+    os.makedirs(exp_path, exist_ok=True)
+
+    # Create the object to handle the data loading
+    data_module = COVIDDataModule(args.data_tsv,
+                                  args.labels,
+                                  args.batch_size,
+                                  shuffle=True,
+                                  target_size=args.target_size,
+                                  augmentations=args.augmentations,
+                                  num_workers=args.num_workers,
+                                  pin_memory=True,
+                                  to_rgb=args.to_rgb)
+
+    # Create the model
+    model = get_model(args.model,
+                      (1, *args.target_size),  # Input shape
+                      len(args.labels),  # Number of classes
+                      args)
+
+    # Prepare training callbacks
+    exp_ckpts_path = os.path.join(exp_path, "ckpts")
+    ckpt_callback = ModelCheckpoint(dirpath=exp_ckpts_path,
+                                    monitor="val_loss",
+                                    save_top_k=1)
+
     # Prepare the logger
-    os.makedirs(args.logs, exist_ok=True)
-    logger = TensorBoardLogger(args.logs, name=exp_name)
+    logger = TensorBoardLogger(exp_path, name="tensorboard_logs")
 
     # Create the object to configure and execute training
     trainer = Trainer(gpus=args.gpus,
@@ -111,7 +116,10 @@ if __name__ == "__main__":
         help="Model architecture to train",
         default="ResNet18",
         type=str,
-        choices=["ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152"])
+        choices=["ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152",
+                 "PretrainedResNet18", "PretrainedResNet34",
+                 "PretrainedResNet50", "PretrainedResNet101",
+                 "PretrainedResNet152"])
 
     arg_parser.add_argument(
         "--optimizer", "-opt",
@@ -130,8 +138,14 @@ if __name__ == "__main__":
         "--augmentations", "-augs",
         help="Set of augmentations to select",
         default="0.0",
-        choices=["0.0"],
+        choices=["0.0", "1.0", "1.1"],
         type=str)
+
+    arg_parser.add_argument(
+        "--to-rgb",
+        help=("Converts grayscale images to rgb replicating the single channel"
+              " (Used for pretrained models)"),
+        action="store_true")
 
     arg_parser.add_argument(
         "--gpus",
@@ -158,13 +172,8 @@ if __name__ == "__main__":
         default=None)
 
     arg_parser.add_argument(
-        "--models-ckpts",
-        help="Path to the folder for saving the ONNX models checkpoints",
-        default="models_ckpts")
-
-    arg_parser.add_argument(
         "--logs",
-        help="Path to the folder for saving the training logs",
+        help="Path to the folder for saving the experiments logs",
         default="logs")
 
     main(arg_parser.parse_args())

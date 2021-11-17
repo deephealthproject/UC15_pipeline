@@ -27,6 +27,34 @@ def augmentations_v0_0(size: tuple) -> A.Compose:
                       A.ToFloat(255.0)])
 
 
+def augmentations_v1_0(size: tuple) -> A.Compose:
+    """
+    Returns the v1.0 augmentations for the train split.
+    The v1.0 applies some basic augmentations playing with the brightness,
+    contrast and small image rotations.
+    """
+    return A.Compose([A.Resize(*size, interpolation=cv2.INTER_CUBIC),
+                      A.HorizontalFlip(p=0.5),
+                      A.Rotate(limit=(-10, 10)),
+                      A.RandomBrightnessContrast(brightness_limit=(0, 0.2),
+                                                 contrast_limit=0.2),
+                      A.ToFloat(255.0)])
+
+
+def augmentations_v1_1(size: tuple) -> A.Compose:
+    """
+    Returns the v1.1 augmentations for the train split.
+    The v1.1 applies the same augmentations than the v1.0 but more
+    aggressively.
+    """
+    return A.Compose([A.Resize(*size, interpolation=cv2.INTER_CUBIC),
+                      A.HorizontalFlip(p=0.5),
+                      A.Rotate(limit=(-15, 15)),
+                      A.RandomBrightnessContrast(brightness_limit=(0, 0.3),
+                                                 contrast_limit=0.4),
+                      A.ToFloat(255.0)])
+
+
 def get_augmentations(version: str, size: tuple) -> A.Compose:
     """
     Auxiliary function to get the selected set of data augmentations using
@@ -43,12 +71,11 @@ def get_augmentations(version: str, size: tuple) -> A.Compose:
     """
     if version == "0.0":
         return augmentations_v0_0(size)
-    """
     if version == "1.0":
         return augmentations_v1_0(size)
     if version == "1.1":
         return augmentations_v1_1(size)
-    """
+
     raise Exception("Wrong augmentations version provided!")
 
 
@@ -61,7 +88,7 @@ class COVIDDataset(torch.utils.data.Dataset):
     Class to load the samples of the dataset.
     """
 
-    def __init__(self, data_df, transformations=None):
+    def __init__(self, data_df, transformations=None, to_rgb=False):
         """
         Prepares the dataset object.
 
@@ -69,9 +96,13 @@ class COVIDDataset(torch.utils.data.Dataset):
             data_df: DataFrame with the samples data (image path, labels, ...).
 
             transformations: Transform object to apply to the images.
+
+            to_rgb: If true converts the grayscale images to rgb replicating
+                    the single channel.
         """
         self.data_df = data_df
         self.trans = transformations
+        self.to_rgb = to_rgb
 
     def __len__(self):
         """Returns the number of samples in the dataset."""
@@ -86,7 +117,10 @@ class COVIDDataset(torch.utils.data.Dataset):
 
         # Prepare the torch tensors
         img = torch.tensor(img)
-        img = img.view((1, *img.shape))  # Add the channel dimension
+        if self.to_rgb:
+            img = img.repeat(3, 1, 1)  # Replicate the single channel
+        else:
+            img = img.view((1, *img.shape))  # Add the channel dimension
 
         label = torch.tensor(sample_row['labels'])
 
@@ -102,7 +136,8 @@ class COVIDDataModule(pl.LightningDataModule):
                  target_size=(256, 256),
                  augmentations="0.0",
                  num_workers=0,
-                 pin_memory=True):
+                 pin_memory=True,
+                 to_rgb=False):
         """
         Initializes the DataModule config.
 
@@ -126,6 +161,9 @@ class COVIDDataModule(pl.LightningDataModule):
             num_workers: Number of processes to use for data loading.
 
             pin_memory: To use pinned memory to load the data into the GPUs.
+
+            to_rgb: If true converts the grayscale images to rgb replicating
+                    the single channel.
         """
         super().__init__()
         self.df_path = df_path
@@ -136,6 +174,7 @@ class COVIDDataModule(pl.LightningDataModule):
         self.augs_version = augmentations
         self.num_workers = num_workers
         self.pin_memory = pin_memory
+        self.to_rgb = to_rgb
 
     def _to_one_hot(self, label_str):
         """Converts a label string to the corresponding one hot encoding."""
@@ -175,17 +214,17 @@ class COVIDDataModule(pl.LightningDataModule):
             train = data_df[data_df["split"] == "training"]
             # Get the transformation function to apply DA
             trans = get_augmentations(self.augs_version, self.target_size)
-            self.train_dataset = COVIDDataset(train, trans)
+            self.train_dataset = COVIDDataset(train, trans, self.to_rgb)
 
         if stage in (None, 'validate', 'fit'):
             val = data_df[data_df["split"] == "validation"]
             no_da_trans = get_augmentations("0.0", self.target_size)
-            self.val_dataset = COVIDDataset(val, no_da_trans)
+            self.val_dataset = COVIDDataset(val, no_da_trans, self.to_rgb)
 
         if stage in (None, 'test'):
             test = data_df[data_df["split"] == "test"]
             no_da_trans = get_augmentations("0.0", self.target_size)
-            self.test_dataset = COVIDDataset(test, no_da_trans)
+            self.test_dataset = COVIDDataset(test, no_da_trans, self.to_rgb)
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(self.train_dataset,

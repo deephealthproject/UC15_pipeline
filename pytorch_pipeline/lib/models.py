@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from torch.optim import Adam, SGD
 import pytorch_lightning as pl
 from torchmetrics import Accuracy
+import torchvision.models as models
 
 
 ##########
@@ -454,6 +455,115 @@ class ResNet(pl.LightningModule):
         raise Exception("Wrong optimizer name provided!")
 
 
+class PretrainedResNet(pl.LightningModule):
+    """
+    Class to create a model using transfer learning from a ResNet model.
+    """
+
+    def __init__(self,
+                 resnet_version: int,
+                 num_classes: int,
+                 optimizer: str = "Adam",
+                 learning_rate: float = 0.0001,
+                 pretrained: bool = True):
+        """
+        Model constructor.
+
+        Args:
+            resnet_version: Choices: [18, 34, 50, 101, 152]
+
+            num_classes: Number of units to put in the last Dense layer.
+
+            optimizer: Optimizer type to use (choices: ["Adam", "SGD"]).
+
+            learning_rate: Learning rate to use in the optimizer.
+
+            pretrained: To use or not the pretrained weights from imagenet
+        """
+        super().__init__()
+
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+
+        self.metric = Accuracy()
+
+        if resnet_version == 18:
+            backbone = models.resnet18(pretrained=True)
+        elif resnet_version == 34:
+            backbone = models.resnet34(pretrained=True)
+        elif resnet_version == 50:
+            backbone = models.resnet50(pretrained=True)
+        elif resnet_version == 101:
+            backbone = models.resnet101(pretrained=True)
+        elif resnet_version == 152:
+            backbone = models.resnet152(pretrained=True)
+
+        # Extract the pretrained convolutional part
+        layers = list(backbone.children())[:-1]  # Get the convolutional part
+        self.feature_extractor = nn.Sequential(*layers)
+
+        # Prepare the new classifier
+        num_filters = backbone.fc.in_features
+        self.fully_connected = nn.Sequential(
+            nn.Linear(num_filters, num_classes),
+            nn.Softmax(dim=-1)
+        )
+
+    def forward(self, x):
+        x = self.feature_extractor(x).flatten(1)
+        out = self.fully_connected(x)
+        return out
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y = torch.argmax(y, dim=1)  # From one hot to indexes
+
+        logits = self(x)  # Forward
+
+        # Compute loss and metrics
+        loss = F.cross_entropy(logits, y)
+        acc = self.metric(logits, y)
+
+        self.log('train_loss', loss, prog_bar=True, logger=True)
+        self.log('train_acc', acc, prog_bar=True, logger=True)
+
+        return loss  # Pytorch Lightning handles the backward
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y = torch.argmax(y, dim=1)  # From one hot to indexes
+
+        logits = self(x)  # Forward
+
+        # Compute loss and metrics
+        loss = F.cross_entropy(logits, y)
+        acc = self.metric(logits, y)
+
+        self.log('val_loss', loss, prog_bar=True, logger=True)
+        self.log('val_acc', acc, prog_bar=True, logger=True)
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        y = torch.argmax(y, dim=1)  # From one hot to indexes
+
+        logits = self(x)  # Forward
+
+        # Compute loss and metrics
+        loss = F.cross_entropy(logits, y)
+        acc = self.metric(logits, y)
+
+        self.log('test_loss', loss, prog_bar=True, logger=True)
+        self.log('test_acc', acc, prog_bar=True, logger=True)
+
+    def configure_optimizers(self):
+        if self.optimizer == "Adam":
+            return Adam(self.parameters(), lr=self.learning_rate)
+        if self.optimizer == "SGD":
+            return SGD(self.parameters(), lr=self.learning_rate, momentum=0.9)
+
+        raise Exception("Wrong optimizer name provided!")
+
+
 def get_model(model_name: str,
               in_shape: tuple,
               num_classes: int,
@@ -509,5 +619,32 @@ def get_model(model_name: str,
                       n_blocks=[3, 8, 36, 3],
                       optimizer=args.optimizer,
                       learning_rate=args.learning_rate)
+
+    # Pretrained ResNet models
+    if model_name == "PretrainedResNet18":
+        return PretrainedResNet(18,
+                                num_classes,
+                                args.optimizer,
+                                args.learning_rate)
+    if model_name == "PretrainedResNet34":
+        return PretrainedResNet(34,
+                                num_classes,
+                                args.optimizer,
+                                args.learning_rate)
+    if model_name == "PretrainedResNet50":
+        return PretrainedResNet(50,
+                                num_classes,
+                                args.optimizer,
+                                args.learning_rate)
+    if model_name == "PretrainedResNet101":
+        return PretrainedResNet(101,
+                                num_classes,
+                                args.optimizer,
+                                args.learning_rate)
+    if model_name == "PretrainedResNet152":
+        return PretrainedResNet(152,
+                                num_classes,
+                                args.optimizer,
+                                args.learning_rate)
 
     raise Exception("Wrong model name provided!")
