@@ -12,6 +12,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from lib.data import COVIDDataModule
 from lib.models import get_model
+from lib.training import FeatureExtractorFreezeUnfreeze
 
 
 def main(args):
@@ -48,10 +49,18 @@ def main(args):
                       args)
 
     # Prepare training callbacks
+    callbacks = []
+
     exp_ckpts_path = os.path.join(exp_path, "ckpts")
     ckpt_callback = ModelCheckpoint(dirpath=exp_ckpts_path,
                                     monitor="val_loss",
                                     save_top_k=1)
+    callbacks.append(ckpt_callback)
+
+    if model.pretrained and args.frozen_epochs > 0:
+        freeze_unfreeze_callback = FeatureExtractorFreezeUnfreeze(
+            unfreeze_at_epoch=args.frozen_epochs+1)
+        callbacks.append(freeze_unfreeze_callback)
 
     # Prepare the logger
     logger = TensorBoardLogger(exp_path, name="tensorboard_logs")
@@ -59,7 +68,7 @@ def main(args):
     # Create the object to configure and execute training
     trainer = Trainer(gpus=args.gpus,
                       deterministic=True,  # For reproducibility
-                      callbacks=[ckpt_callback],
+                      callbacks=callbacks,
                       max_epochs=args.epochs,
                       profiler=args.profiler,
                       logger=logger)
@@ -109,6 +118,13 @@ if __name__ == "__main__":
         "--epochs",
         help="Number of epochs to train",
         default=10,
+        type=int)
+
+    arg_parser.add_argument(
+        "--frozen-epochs",
+        help=("In case of using a pretrained model, this param sets the "
+              "number of epochs with the pretrained weights frozen."),
+        default=5,
         type=int)
 
     arg_parser.add_argument(

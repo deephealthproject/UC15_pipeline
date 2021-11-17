@@ -353,6 +353,9 @@ class ResNet(pl.LightningModule):
         """
         super().__init__()
 
+        # Needed for the pipeline to freeze the weights or not
+        self.pretrained = False
+
         self.optimizer = optimizer
         self.learning_rate = learning_rate
 
@@ -484,19 +487,20 @@ class PretrainedResNet(pl.LightningModule):
 
         self.optimizer = optimizer
         self.learning_rate = learning_rate
+        self.pretrained = pretrained
 
         self.metric = Accuracy()
 
         if resnet_version == 18:
-            backbone = models.resnet18(pretrained=True)
+            backbone = models.resnet18(pretrained=self.pretrained)
         elif resnet_version == 34:
-            backbone = models.resnet34(pretrained=True)
+            backbone = models.resnet34(pretrained=self.pretrained)
         elif resnet_version == 50:
-            backbone = models.resnet50(pretrained=True)
+            backbone = models.resnet50(pretrained=self.pretrained)
         elif resnet_version == 101:
-            backbone = models.resnet101(pretrained=True)
+            backbone = models.resnet101(pretrained=self.pretrained)
         elif resnet_version == 152:
-            backbone = models.resnet152(pretrained=True)
+            backbone = models.resnet152(pretrained=self.pretrained)
 
         # Extract the pretrained convolutional part
         layers = list(backbone.children())[:-1]  # Get the convolutional part
@@ -557,9 +561,11 @@ class PretrainedResNet(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.optimizer == "Adam":
-            return Adam(self.parameters(), lr=self.learning_rate)
+            return Adam(filter(lambda p: p.requires_grad, self.parameters()),
+                        lr=self.learning_rate)
         if self.optimizer == "SGD":
-            return SGD(self.parameters(), lr=self.learning_rate, momentum=0.9)
+            return SGD(filter(lambda p: p.requires_grad, self.parameters()),
+                       lr=self.learning_rate, momentum=0.9)
 
         raise Exception("Wrong optimizer name provided!")
 
