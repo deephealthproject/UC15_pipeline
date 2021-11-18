@@ -148,9 +148,12 @@ class ResNet(pl.LightningModule):
         targets = torch.cat([out['y_true'] for out in outputs])
 
         # Compute test metrics
-        precision = Fmetrics.precision(preds, targets, preds.shape[1])
-        recall = Fmetrics.recall(preds, targets, preds.shape[1])
-        conf_matrix = Fmetrics.confusion_matrix(preds, targets, preds.shape[1])
+        precision = Fmetrics.precision(preds, targets,
+                                       num_classes=preds.shape[1])
+        recall = Fmetrics.recall(preds, targets,
+                                 num_classes=preds.shape[1])
+        conf_matrix = Fmetrics.confusion_matrix(preds, targets,
+                                                num_classes=preds.shape[1])
 
         print(f'Precision: {precision}')
         print(f'Recall: {recall}')
