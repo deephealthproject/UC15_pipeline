@@ -72,7 +72,10 @@ class ResNet(pl.LightningModule):
         # Prepare the new classifier
         num_filters = backbone.fc.in_features
         self.fully_connected = nn.Sequential(
-            nn.Linear(num_filters, num_classes),
+            nn.Linear(num_filters, num_filters // 2),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(num_filters // 2, num_classes),
             nn.Softmax(dim=-1)
         )
 
