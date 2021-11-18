@@ -5,10 +5,11 @@ import os
 import argparse
 import multiprocessing
 from datetime import datetime
+import json
 
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
+from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
 
 from lib.data import COVIDDataModule
 from lib.models import get_model
@@ -31,6 +32,10 @@ def main(args):
     exp_path = os.path.join(args.logs, exp_name)
     os.makedirs(exp_path, exist_ok=True)
 
+    # Save the experiment config in a JSON file
+    with open(os.path.join(exp_path, "args.json"), 'w') as fstream:
+        json.dump(vars(args), fstream, indent=4, sort_keys=True)
+
     # Create the object to handle the data loading
     data_module = COVIDDataModule(args.data_tsv,
                                   args.labels,
@@ -50,34 +55,35 @@ def main(args):
 
     # Prepare training callbacks
     callbacks = []
-
     exp_ckpts_path = os.path.join(exp_path, "ckpts")
     ckpt_callback = ModelCheckpoint(dirpath=exp_ckpts_path,
                                     monitor="val_loss",
                                     save_top_k=1)
     callbacks.append(ckpt_callback)
+    callbacks.append(ModelSummary(max_depth=-1))
 
     if model.pretrained and args.frozen_epochs > 0:
-        freeze_unfreeze_callback = FeatureExtractorFreezeUnfreeze(
-            unfreeze_at_epoch=args.frozen_epochs+1)
-        callbacks.append(freeze_unfreeze_callback)
+        callbacks.append(FeatureExtractorFreezeUnfreeze(
+            unfreeze_at_epoch=args.frozen_epochs))
 
-    # Prepare the logger
-    logger = TensorBoardLogger(exp_path, name="tensorboard_logs")
+    # Prepare the loggers
+    loggers = []
+    loggers.append(TensorBoardLogger(exp_path, name="tensorboard_logs"))
+    loggers.append(CSVLogger(exp_path, name="metrics"))
 
     # Create the object to configure and execute training
     trainer = Trainer(gpus=args.gpus,
-                      deterministic=True,  # For reproducibility
                       callbacks=callbacks,
                       max_epochs=args.epochs,
                       profiler=args.profiler,
-                      logger=logger)
+                      logger=loggers)
 
     # Train the model
     trainer.fit(model, datamodule=data_module)
 
-    # Test with test split
-    trainer.test(model, datamodule=data_module)
+    # Test with the best model from the train phase
+    trainer.test(model, datamodule=data_module,
+                 ckpt_path=ckpt_callback.best_model_path)
 
 
 if __name__ == "__main__":
