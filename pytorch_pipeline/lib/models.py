@@ -24,7 +24,8 @@ class ResNet(pl.LightningModule):
                  num_classes: int,
                  optimizer: str = "Adam",
                  learning_rate: float = 0.0001,
-                 pretrained: bool = True):
+                 pretrained: bool = True,
+                 l2_penalty: float = 0.0):
         """
         Model constructor.
 
@@ -38,12 +39,15 @@ class ResNet(pl.LightningModule):
             learning_rate: Learning rate to use in the optimizer.
 
             pretrained: To use or not the pretrained weights from imagenet
+
+            l2_penalty: Value tu use for the weight decay in the optimizer.
         """
         super().__init__()
 
         self.optimizer = optimizer
         self.learning_rate = learning_rate
         self.pretrained = pretrained
+        self.l2_penalty = l2_penalty
 
         self.metric = Accuracy()
 
@@ -162,10 +166,13 @@ class ResNet(pl.LightningModule):
     def configure_optimizers(self):
         if self.optimizer == "Adam":
             return Adam(filter(lambda p: p.requires_grad, self.parameters()),
-                        lr=self.learning_rate)
+                        lr=self.learning_rate,
+                        weight_decay=self.l2_penalty)
         if self.optimizer == "SGD":
             return SGD(filter(lambda p: p.requires_grad, self.parameters()),
-                       lr=self.learning_rate, momentum=0.9)
+                       lr=self.learning_rate,
+                       momentum=0.9,
+                       weight_decay=self.l2_penalty)
 
         raise Exception("Wrong optimizer name provided!")
 
@@ -195,57 +202,67 @@ def get_model(model_name: str,
                       num_classes,
                       args.optimizer,
                       args.learning_rate,
-                      pretrained=False)
+                      pretrained=False,
+                      l2_penalty=args.l2_penalty)
     if model_name == "ResNet34":
         return ResNet(34,
                       num_classes,
                       args.optimizer,
                       args.learning_rate,
-                      pretrained=False)
+                      pretrained=False,
+                      l2_penalty=args.l2_penalty)
     if model_name == "ResNet50":
         return ResNet(50,
                       num_classes,
                       args.optimizer,
                       args.learning_rate,
-                      pretrained=False)
+                      pretrained=False,
+                      l2_penalty=args.l2_penalty)
     if model_name == "ResNet101":
         return ResNet(101,
                       num_classes,
                       args.optimizer,
                       args.learning_rate,
-                      pretrained=False)
+                      pretrained=False,
+                      l2_penalty=args.l2_penalty)
     if model_name == "ResNet152":
         return ResNet(152,
                       num_classes,
                       args.optimizer,
                       args.learning_rate,
-                      pretrained=False)
+                      pretrained=False,
+                      l2_penalty=args.l2_penalty)
 
     # Pretrained ResNet models
     if model_name == "PretrainedResNet18":
         return ResNet(18,
                       num_classes,
                       args.optimizer,
-                      args.learning_rate)
+                      args.learning_rate,
+                      l2_penalty=args.l2_penalty)
     if model_name == "PretrainedResNet34":
         return ResNet(34,
                       num_classes,
                       args.optimizer,
-                      args.learning_rate)
+                      args.learning_rate,
+                      l2_penalty=args.l2_penalty)
     if model_name == "PretrainedResNet50":
         return ResNet(50,
                       num_classes,
                       args.optimizer,
-                      args.learning_rate)
+                      args.learning_rate,
+                      l2_penalty=args.l2_penalty)
     if model_name == "PretrainedResNet101":
         return ResNet(101,
                       num_classes,
                       args.optimizer,
-                      args.learning_rate)
+                      args.learning_rate,
+                      l2_penalty=args.l2_penalty)
     if model_name == "PretrainedResNet152":
         return ResNet(152,
                       num_classes,
                       args.optimizer,
-                      args.learning_rate)
+                      args.learning_rate,
+                      l2_penalty=args.l2_penalty)
 
     raise Exception("Wrong model name provided!")

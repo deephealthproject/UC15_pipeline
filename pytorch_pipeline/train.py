@@ -157,6 +157,12 @@ if __name__ == "__main__":
         type=float)
 
     arg_parser.add_argument(
+        "--l2-penalty", "-l2",
+        help="Value to use for the L2 penalty",
+        default=0.0,
+        type=float)
+
+    arg_parser.add_argument(
         "--augmentations", "-augs",
         help="Set of augmentations to select",
         default="0.0",
