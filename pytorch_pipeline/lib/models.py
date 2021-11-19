@@ -2,16 +2,12 @@
 Module to create the models architectures.
 """
 import argparse
-from statistics import mean
 
-import torch
 from torch import nn
-import torch.nn.functional as F
-from torch.optim import Adam, SGD
 import pytorch_lightning as pl
-from torchmetrics import Accuracy
-from torchmetrics import functional as Fmetrics
 import torchvision.models as models
+
+from .training import ImageClassifier
 
 
 class ResNet(nn.Module):
@@ -47,6 +43,8 @@ class ResNet(nn.Module):
             backbone = models.resnet101(pretrained=pretrained)
         elif resnet_version == 152:
             backbone = models.resnet152(pretrained=pretrained)
+        else:
+            raise Exception(f"ResNet version '{resnet_version}' is not valid!")
 
         # Extract the pretrained convolutional part
         layers = list(backbone.children())[:-1]  # Get the convolutional part
@@ -68,139 +66,61 @@ class ResNet(nn.Module):
         return out
 
 
-class ImageClassifier(pl.LightningModule):
+class VGG(nn.Module):
     """
-    Wrapper to train an image classifier model
+    Class to create a model using transfer learning from a VGG model.
     """
 
     def __init__(self,
-                 model: nn.Module,
-                 optimizer: str = "Adam",
-                 learning_rate: float = 0.0001,
-                 l2_penalty: float = 0.0):
+                 vgg_version: str,
+                 num_classes: int,
+                 pretrained: bool = True):
         """
         Model constructor.
 
         Args:
-            model: Pytorch module of the model to train.
+            vgg_version: Choices: ["16", "16BN", "19", "19BN"]
 
-            optimizer: Optimizer type to use (choices: ["Adam", "SGD"]).
+            num_classes: Number of units to put in the last Dense layer.
 
-            learning_rate: Learning rate to use in the optimizer.
-
-            l2_penalty: Value tu use for the weight decay in the optimizer.
+            pretrained: To use or not the pretrained weights from imagenet
         """
-        super().__init__()
+        super(VGG, self).__init__()
 
-        self.optimizer = optimizer
-        self.learning_rate = learning_rate
-        self.pretrained = model.pretrained  # We need this for the pipeline
-        self.l2_penalty = l2_penalty
+        self.pretrained = pretrained  # We need this for the pipeline
 
-        self.metric = Accuracy()
+        if vgg_version == "16":
+            backbone = models.vgg16(pretrained=pretrained)
+        elif vgg_version == "16BN":
+            backbone = models.vgg16_bn(pretrained=pretrained)
+        elif vgg_version == "19":
+            backbone = models.vgg19(pretrained=pretrained)
+        elif vgg_version == "19BN":
+            backbone = models.vgg19_bn(pretrained=pretrained)
+        else:
+            raise Exception(f"VGG version '{vgg_version}' is not valid!")
 
-        self.last_val_loss = None
-        self.last_val_acc = None
+        # Extract the pretrained convolutional part
+        layers = list(backbone.children())[:-1]  # Get the convolutional part
+        self.feature_extractor = nn.Sequential(*layers)
 
-        self.model = model
+        # Prepare the new classifier
+        in_features = list(backbone.classifier.children())[0].in_features
+        self.fully_connected = nn.Sequential(
+            nn.Linear(in_features, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(4096, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(4096, num_classes),
+            nn.Softmax(dim=-1)
+        )
 
     def forward(self, x):
-        return self.model(x)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        y = torch.argmax(y, dim=1)  # From one hot to indexes
-
-        logits = self(x)  # Forward
-
-        # Compute loss and metrics
-        loss = F.cross_entropy(logits, y)
-        acc = self.metric(logits, y)
-
-        self.log('batch_loss', loss, prog_bar=True, logger=False)
-        self.log('batch_acc', acc, prog_bar=True, logger=False)
-
-        return {'loss': loss, 'acc': acc}
-
-    def training_epoch_end(self, outputs):
-        train_loss = mean(map(lambda x: x['loss'].item(), outputs))
-        train_acc = mean(map(lambda x: x['acc'].item(), outputs))
-
-        # Store the final epoch results with the logger
-        self.log('train_loss', train_loss, logger=True)
-        self.log('train_acc', train_acc, logger=True)
-        if self.last_val_loss is not None:
-            self.log('val_loss', self.last_val_loss, logger=True)
-            self.log('val_acc', self.last_val_acc, logger=True)
-        else:
-            raise Exception("Validation metrics not found!")
-
-        print(('\nEpoch results: '
-               f'train_loss={train_loss:.4f} - '
-               f'train_acc={train_acc:.4f} - '
-               f'val_loss={self.last_val_loss:.4f} - '
-               f'val_acc={self.last_val_acc:.4f}\n'))
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y = torch.argmax(y, dim=1)  # From one hot to indexes
-
-        logits = self(x)  # Forward
-
-        # Compute loss and metrics
-        loss = F.cross_entropy(logits, y)
-        acc = self.metric(logits, y)
-
-        return {'loss': loss, 'acc': acc}
-
-    def validation_epoch_end(self, outputs):
-        # Store the values to log them at the end of the training epoch
-        self.last_val_loss = mean(map(lambda x: x['loss'].item(), outputs))
-        self.last_val_acc = mean(map(lambda x: x['acc'].item(), outputs))
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        y = torch.argmax(y, dim=1)  # From one hot to indexes
-
-        logits = self(x)  # Forward
-
-        # Compute loss and metrics
-        loss = F.cross_entropy(logits, y)
-        acc = self.metric(logits, y)
-
-        self.log('test_loss', loss, prog_bar=False, on_epoch=True, logger=True)
-        self.log('test_acc', acc, prog_bar=False, on_epoch=True, logger=True)
-
-        return {'loss': loss, 'acc': acc, 'y_pred': logits, 'y_true': y}
-
-    def test_epoch_end(self, outputs):
-        preds = torch.cat([out['y_pred'] for out in outputs])
-        targets = torch.cat([out['y_true'] for out in outputs])
-
-        # Compute test metrics
-        precision = Fmetrics.precision(preds, targets,
-                                       num_classes=preds.shape[1])
-        recall = Fmetrics.recall(preds, targets,
-                                 num_classes=preds.shape[1])
-        conf_matrix = Fmetrics.confusion_matrix(preds, targets,
-                                                num_classes=preds.shape[1])
-
-        print(f'Precision: {precision}')
-        print(f'Recall: {recall}')
-        print("Confusion matrix:\n", conf_matrix)
-
-    def configure_optimizers(self):
-        if self.optimizer == "Adam":
-            return Adam(filter(lambda p: p.requires_grad, self.parameters()),
-                        lr=self.learning_rate,
-                        weight_decay=self.l2_penalty)
-        if self.optimizer == "SGD":
-            return SGD(filter(lambda p: p.requires_grad, self.parameters()),
-                       lr=self.learning_rate,
-                       momentum=0.9,
-                       weight_decay=self.l2_penalty)
-
-        raise Exception("Wrong optimizer name provided!")
+        x = self.feature_extractor(x).flatten(1)
+        out = self.fully_connected(x)
+        return out
 
 
 def get_model(model_name: str,
@@ -244,6 +164,24 @@ def get_model(model_name: str,
         model = ResNet(101, num_classes, pretrained=True)
     elif model_name == "PretrainedResNet152":
         model = ResNet(152, num_classes, pretrained=True)
+    # NO pretrained VGG models
+    elif model_name == "VGG16":
+        model = VGG("16", num_classes, pretrained=False)
+    elif model_name == "VGG16BN":
+        model = VGG("16BN", num_classes, pretrained=False)
+    elif model_name == "VGG19":
+        model = VGG("19", num_classes, pretrained=False)
+    elif model_name == "VGG19BN":
+        model = VGG("19BN", num_classes, pretrained=False)
+    # Pretrained VGG models
+    elif model_name == "PretrainedVGG16":
+        model = VGG("16", num_classes, pretrained=True)
+    elif model_name == "PretrainedVGG16BN":
+        model = VGG("16BN", num_classes, pretrained=True)
+    elif model_name == "PretrainedVGG19":
+        model = VGG("19", num_classes, pretrained=True)
+    elif model_name == "PretrainedVGG19BN":
+        model = VGG("19BN", num_classes, pretrained=True)
     else:
         raise Exception("Wrong model name provided!")
 
