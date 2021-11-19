@@ -137,7 +137,8 @@ class COVIDDataModule(pl.LightningDataModule):
                  augmentations="0.0",
                  num_workers=0,
                  pin_memory=True,
-                 to_rgb=False):
+                 to_rgb=False,
+                 drop_last=True):
         """
         Initializes the DataModule config.
 
@@ -164,6 +165,9 @@ class COVIDDataModule(pl.LightningDataModule):
 
             to_rgb: If true converts the grayscale images to rgb replicating
                     the single channel.
+
+            drop_last: To drop the last batch incomplete batch, if the dataset
+                       is not divisible by the batch size.
         """
         super().__init__()
         self.df_path = df_path
@@ -175,6 +179,7 @@ class COVIDDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
         self.to_rgb = to_rgb
+        self.drop_last = drop_last
 
     def _to_one_hot(self, label_str):
         """Converts a label string to the corresponding one hot encoding."""
@@ -231,18 +236,21 @@ class COVIDDataModule(pl.LightningDataModule):
                                            batch_size=self.batch_size,
                                            shuffle=self.shuffle,
                                            num_workers=self.num_workers,
-                                           pin_memory=self.pin_memory)
+                                           pin_memory=self.pin_memory,
+                                           drop_last=self.drop_last)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.val_dataset,
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,
-                                           pin_memory=self.pin_memory)
+                                           pin_memory=self.pin_memory,
+                                           drop_last=self.drop_last)
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(self.test_dataset,
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,
-                                           pin_memory=self.pin_memory)
+                                           pin_memory=self.pin_memory,
+                                           drop_last=self.drop_last)
