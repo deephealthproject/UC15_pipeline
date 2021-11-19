@@ -637,17 +637,14 @@ def pretrained_vgg16(in_shape: tuple,
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.Dense(l, 4096, name="dense1")
     l = eddl.ReLu(l, name="dense1_relu")
-    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.Dense(l, 4096, name="dense2")
     l = eddl.ReLu(l, name="dense2_relu")
-    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense2_dropout")
     # Dense 3
-    l = eddl.Dense(l, input_units // 64, name="dense3")
-    l = eddl.ReLu(l, name="dense3_relu")
-    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
         out_ = edd.Sigmoid(l)
@@ -655,7 +652,7 @@ def pretrained_vgg16(in_shape: tuple,
         out_ = edd.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
-    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+    layer2init = ["dense1", "dense2", "dense_out"]
 
     return eddl.Model([in_], [out_]), False, layer2init
 
@@ -697,17 +694,14 @@ def pretrained_vgg16BN(in_shape: tuple,
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.Dense(l, 4096, name="dense1")
     l = eddl.ReLu(l, name="dense1_relu")
-    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.Dense(l, 4096, name="dense2")
     l = eddl.ReLu(l, name="dense2_relu")
-    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense2_dropout")
     # Dense 3
-    l = eddl.Dense(l, input_units // 64, name="dense3")
-    l = eddl.ReLu(l, name="dense3_relu")
-    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
         out_ = edd.Sigmoid(l)
@@ -715,7 +709,7 @@ def pretrained_vgg16BN(in_shape: tuple,
         out_ = edd.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
-    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+    layer2init = ["dense1", "dense2", "dense_out"]
 
     return eddl.Model([in_], [out_]), False, layer2init
 
@@ -757,17 +751,14 @@ def pretrained_vgg19(in_shape: tuple,
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.Dense(l, 4096, name="dense1")
     l = eddl.ReLu(l, name="dense1_relu")
-    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.Dense(l, 4096, name="dense2")
     l = eddl.ReLu(l, name="dense2_relu")
-    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense2_dropout")
     # Dense 3
-    l = eddl.Dense(l, input_units // 64, name="dense3")
-    l = eddl.ReLu(l, name="dense3_relu")
-    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
         out_ = edd.Sigmoid(l)
@@ -775,7 +766,7 @@ def pretrained_vgg19(in_shape: tuple,
         out_ = edd.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
-    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+    layer2init = ["dense1", "dense2", "dense_out"]
 
     return eddl.Model([in_], [out_]), False, layer2init
 
@@ -817,17 +808,14 @@ def pretrained_vgg19BN(in_shape: tuple,
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, input_units // 4, name="dense1")
+    l = eddl.Dense(l, 4096, name="dense1")
     l = eddl.ReLu(l, name="dense1_relu")
-    l = eddl.Dropout(l, 0.5, name="dense1_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, input_units // 16, name="dense2")
+    l = eddl.Dense(l, 4096, name="dense2")
     l = eddl.ReLu(l, name="dense2_relu")
-    l = eddl.Dropout(l, 0.5, name="dense2_dropout")
+    l = eddl.Dropout(l, 0.4, name="dense2_dropout")
     # Dense 3
-    l = eddl.Dense(l, input_units // 64, name="dense3")
-    l = eddl.ReLu(l, name="dense3_relu")
-    l = eddl.Dropout(l, 0.5, name="dense3_dropout")
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
         out_ = edd.Sigmoid(l)
@@ -835,7 +823,7 @@ def pretrained_vgg19BN(in_shape: tuple,
         out_ = edd.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
-    layer2init = ["dense1", "dense2", "dense3", "dense_out"]
+    layer2init = ["dense1", "dense2", "dense_out"]
 
     return eddl.Model([in_], [out_]), False, layer2init
 
