@@ -647,9 +647,9 @@ def pretrained_vgg16(in_shape: tuple,
     # Dense 3
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
-        out_ = edd.Sigmoid(l)
+        out_ = eddl.Sigmoid(l)
     else:
-        out_ = edd.Softmax(l)
+        out_ = eddl.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
@@ -704,9 +704,9 @@ def pretrained_vgg16BN(in_shape: tuple,
     # Dense 3
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
-        out_ = edd.Sigmoid(l)
+        out_ = eddl.Sigmoid(l)
     else:
-        out_ = edd.Softmax(l)
+        out_ = eddl.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
@@ -761,9 +761,9 @@ def pretrained_vgg19(in_shape: tuple,
     # Dense 3
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
-        out_ = edd.Sigmoid(l)
+        out_ = eddl.Sigmoid(l)
     else:
-        out_ = edd.Softmax(l)
+        out_ = eddl.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
@@ -818,9 +818,9 @@ def pretrained_vgg19BN(in_shape: tuple,
     # Dense 3
     l = eddl.Dense(l, num_classes, name="dense_out")
     if multiclass:
-        out_ = edd.Sigmoid(l)
+        out_ = eddl.Sigmoid(l)
     else:
-        out_ = edd.Softmax(l)
+        out_ = eddl.Softmax(l)
 
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
