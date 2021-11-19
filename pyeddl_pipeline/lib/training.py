@@ -312,7 +312,7 @@ def train(model: eddl.Model,
 
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.training)
-        dataset.ResetAllBatches(shuffle=True)
+        dataset.ResetBatch(ecvl.SplitType.training, shuffle=True)
         dataset.Start()  # Spawn workers
 
         eddl.reset_loss(model)
@@ -354,6 +354,7 @@ def train(model: eddl.Model,
 
         # Prepare dataset
         dataset.SetSplit(ecvl.SplitType.validation)
+        dataset.ResetBatch(ecvl.SplitType.validation, shuffle=False)
         dataset.Start()  # Spawn workers
 
         eddl.reset_loss(model)
@@ -469,7 +470,7 @@ def test(model: eddl.Model,
 
     # Prepare dataset
     dataset.SetSplit(ecvl.SplitType.test)
-    dataset.ResetAllBatches()
+    dataset.ResetBatch(ecvl.SplitType.test, shuffle=False)
     dataset.Start()  # Spawn workers
 
     eddl.reset_loss(model)
