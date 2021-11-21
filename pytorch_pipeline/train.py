@@ -108,7 +108,8 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--batch-size", "-bs",
         help="Size of the training batches of data",
-        default=16)
+        default=16,
+        type=int)
 
     arg_parser.add_argument(
         "--labels",
