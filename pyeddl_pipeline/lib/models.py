@@ -8,9 +8,9 @@ import urllib.request
 import pyeddl.eddl as eddl
 
 
-##########
-# ResNet #
-##########
+#########
+# Utils #
+#########
 
 def conv_bn_relu(in_layer,  # A EDDL layer
                  filters: int,
@@ -33,260 +33,6 @@ def conv_bn_relu(in_layer,  # A EDDL layer
     relu = eddl.ReLu(bn)
 
     return relu
-
-
-def bn_relu_conv(in_layer,  # A EDDL layer
-                 filters: int,
-                 kernel_size: tuple = (3, 3),
-                 strides: tuple = (1, 1),
-                 padding: str = "same"):
-    """
-    Builds the sequence of layers: BatchNormalization -> ReLu -> Conv2D.
-
-    Args:
-        in_layer: Input layer of the Conv2D.
-
-        **args: The parameters for the Conv2D layer.
-
-    Returns:
-        The reference to the last layer of the sequence (Conv2D).
-    """
-    bn = eddl.BatchNormalization(in_layer, affine=True)
-    relu = eddl.ReLu(bn)
-    conv = eddl.Conv(relu, filters, kernel_size, strides, padding)
-
-    return conv
-
-
-def shortcut(in_layer, residual):
-    """
-    Given the input of a residual block and its residual output, this function
-    creates the shortcut connection (with an Add layer) and fixes the
-    input tensor size (height, width) or channels if needed.
-
-    Args:
-        in_layer: An EDDL layer.
-
-        residual: An EDDL layer.
-
-    Returns:
-        The reference to the Add layer that performs the shortcut.
-    """
-    # Check if the shapes match
-    in_ch, in_h, in_w = in_layer.output.shape[-3:]
-    res_ch, res_h, res_w = residual.output.shape[-3:]
-    # The stride values should be integers after division
-    stride_h = in_h // res_h
-    stride_w = in_w // res_w
-    eq_channels = in_ch == res_ch
-
-    shortcut = in_layer
-    if stride_h > 1 or stride_w > 1 or not eq_channels:
-        # Use a 1x1 Conv to fix the shape
-        shortcut = eddl.Conv(in_layer,
-                             res_ch,
-                             (1, 1),
-                             (stride_h, stride_w),
-                             "valid")
-
-    return eddl.Add([shortcut, residual])
-
-
-def basic_block(in_layer,  # A EDDL Layer
-                filters: int,
-                strides: tuple = (1, 1),
-                is_first_layer: bool = False):
-    """
-    Builds a basic convolutional block with a shortcut at the end to add the
-    residual connection.
-
-    Args:
-        in_layer: Input layer of the convolutional block.
-
-        filters: Number of filters for the Conv layer.
-
-        strides: Strides of the Conv layer. The shapes are then fixed in the
-                 shortcut at the end of the block.
-
-        is_first_layer: To avoid using preactivation for the first layer of
-                        the first convolutional block. Because the previous
-                        layers are BN -> ReLu -> MaxPool2D.
-
-    Returns:
-        A reference to the last layer of the block (after the shortcut).
-    """
-    l = in_layer  # Aux layer to save the input reference for the shortcut
-    if strides == (2, 2):
-        l = eddl.Pad(l, [0, 1, 1, 0])  # Fix asymmetric padding
-        padding = "valid"
-    else:
-        padding = "same"
-
-    if is_first_layer:
-        # Avoid preactivation
-        l = eddl.Conv(l, filters, (3, 3), strides, padding)
-    else:
-        l = bn_relu_conv(l, filters, (3, 3), strides, padding)
-
-    residual = bn_relu_conv(l, filters, (3, 3), (1, 1), "same")
-
-    return shortcut(in_layer, residual)
-
-
-def bottleneck_block(in_layer,  # A EDDL Layer
-                     filters: int,
-                     strides: tuple = (1, 1),
-                     is_first_layer: bool = False):
-    """
-    Builds a bottleneck convolutional block with a shortcut at the end
-    to add the residual connection.
-
-    Args:
-        in_layer: Input layer of the convolutional block.
-
-        filters: Number of kernels for the first 2 Conv layers. The third
-                 layer uses "filters * 4" kernels.
-
-        strides: Strides of the Conv layer. The shapes are then fixed in the
-                 shortcut at the end of the block.
-
-        is_first_layer: To avoid using preactivation for the first layer of
-                        the first convolutional block. Because the previous
-                        layers are BN -> ReLu -> MaxPool2D.
-
-    Returns:
-        A reference to the last layer of the block (after the shortcut).
-    """
-    if is_first_layer:
-        # Avoid preactivation
-        l = eddl.Conv(in_layer, filters, (1, 1), strides, "same")
-    else:
-        l = bn_relu_conv(in_layer, filters, (1, 1), strides, "same")
-
-    l = bn_relu_conv(l, filters, (3, 3), (1, 1), "same")
-    residual = bn_relu_conv(l, filters * 4, (1, 1), (1, 1), "same")
-
-    return shortcut(in_layer, residual)
-
-
-def residual_block(in_layer,  # A EDDL layer
-                   conv_block: Callable,
-                   filters: int,
-                   n_blocks: int,
-                   is_first_layer: bool = False):
-    """
-    Builds a residual block based on the convolutional block provided.
-
-    Args:
-        in_layer: Input layer for the block.
-
-        conv_block: Basic convolutional block to repeat in order to build
-                    the residual block.
-
-        filters: Filters for the basic convolutional block.
-
-        n_blocks: Number of repetitions of the basic convolutional block.
-
-        is_first_layer: To avoid using preactivation for the first layer of
-                        the first convolutional block. Because the previous
-                        layers are BN -> ReLu -> MaxPool2D.
-
-    Returns:
-        The reference to the last layer of the residual block.
-    """
-    l = in_layer  # Auxiliary reference
-    for b in range(n_blocks):
-        strides = (1, 1)
-        if b == 0 and not is_first_layer:
-            # Add reduction in the fist layer of each residual block
-            strides = (2, 2)
-
-        l = conv_block(l, filters, strides, (is_first_layer and b == 0))
-
-    return l
-
-
-def build_resnet(in_shape: tuple,
-                 num_classes: int,
-                 block_type: Callable,
-                 n_blocks: list,
-                 multiclass: bool) -> list:
-    """
-    Parametrized constructor to build every variant of the ResNet architecture.
-
-    Args:
-        in_shape: Input shape of the model (without batch dimension).
-
-        num_classes: Number of units in the last Dense layer.
-
-        block_type: Function that creates a convolutional block.
-
-        n_blocks: List of ints to determine the number of convolutional blocks
-                  at each level of the model.
-
-        multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-    Returns:
-        A list with:
-            - The EDDL model object with the ResNet architecture.
-
-            - Boolean to indicate if the weights must be initialized.
-
-            - A list with the layer names that should be initialized in case
-              of passing False in the previous output value. Useful when using
-              a pretrained convolutional block followed by a new set of Dense
-              layers for classification.
-    """
-    in_ = eddl.Input(in_shape)
-    # First conv block before the resiual blocks
-    l = eddl.Pad(in_, [3, 3, 3, 3])  # Fix asymmetric padding
-    l = conv_bn_relu(l, 64, (7, 7), (2, 2), "valid")
-    l = eddl.Pad(l, [1, 1, 1, 1])  # Fix asymmetric padding
-    l = eddl.MaxPool2D(l, (3, 3), (2, 2), "valid")
-
-    # Build residual blocks
-    filters = 64
-    for block_idx, n_blocks in enumerate(n_blocks):
-        l = residual_block(in_layer=l,
-                           conv_block=block_type,
-                           filters=filters,
-                           n_blocks=n_blocks,
-                           is_first_layer=(block_idx == 0))
-        filters *= 2
-
-    # Activation before densely connected part
-    l = eddl.BatchNormalization(l, affine=True)
-    l = eddl.ReLu(l)
-
-    l = eddl.GlobalAveragePool2D(l)
-    l = eddl.Flatten(l)
-    l = eddl.Dense(l, num_classes)
-    if multiclass:
-        out_ = eddl.Sigmoid(l)
-    else:
-        out_ = eddl.Softmax(l)
-
-    return eddl.Model([in_], [out_]), True, []
-
-
-def resnet_18(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
-    return build_resnet(in_shape, num_classes, basic_block, [2, 2, 2, 2], multiclass)
-
-
-def resnet_34(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
-    return build_resnet(in_shape, num_classes, basic_block, [3, 4, 6, 3], multiclass)
-
-
-def resnet_50(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
-    return build_resnet(in_shape, num_classes, bottleneck_block, [3, 4, 6, 3], multiclass)
-
-
-def resnet_101(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
-    return build_resnet(in_shape, num_classes, bottleneck_block, [3, 4, 23, 3], multiclass)
-
-
-def resnet_152(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
-    return build_resnet(in_shape, num_classes, bottleneck_block, [3, 8, 36, 3], multiclass)
 
 
 #################
@@ -539,10 +285,11 @@ def model_4(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
     return eddl.Model([in_], [out_]), True, []
 
 
-def pretrained_resnet(in_shape: tuple,
-                      num_classes: int,
-                      version: str,
-                      multiclass: bool) -> list:
+def resnet(in_shape: tuple,
+           num_classes: int,
+           version: str,
+           multiclass: bool,
+           pretrained: bool = True) -> list:
     """
     Uses a pretrained ResNet to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -556,6 +303,8 @@ def pretrained_resnet(in_shape: tuple,
                  Versions available: "18", "34", "50", "101" and "152"
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
+
+        pretrained: If True uses the pretrained weights with imagenet.
 
     Returns:
         A list with:
@@ -597,12 +346,13 @@ def pretrained_resnet(in_shape: tuple,
     else:
         out_ = eddl.Softmax(l)
 
-    return eddl.Model([in_], [out_]), False, ["dense1", "dense_out"]
+    return eddl.Model([in_], [out_]), not pretrained, ["dense1", "dense_out"]
 
 
-def pretrained_vgg16(in_shape: tuple,
-                     num_classes: int,
-                     multiclass: bool) -> list:
+def vgg16(in_shape: tuple,
+          num_classes: int,
+          multiclass: bool,
+          pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG16 to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -613,6 +363,8 @@ def pretrained_vgg16(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
+
+        pretrained: If True uses the pretrained weights with imagenet.
 
     Returns:
         A list with:
@@ -654,12 +406,13 @@ def pretrained_vgg16(in_shape: tuple,
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
 
-    return eddl.Model([in_], [out_]), False, layer2init
+    return eddl.Model([in_], [out_]), not pretrained, layer2init
 
 
-def pretrained_vgg16BN(in_shape: tuple,
-                       num_classes: int,
-                       multiclass: bool) -> list:
+def vgg16BN(in_shape: tuple,
+            num_classes: int,
+            multiclass: bool,
+            pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG16 with BN to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -670,6 +423,8 @@ def pretrained_vgg16BN(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
+
+        pretrained: If True uses the pretrained weights with imagenet.
 
     Returns:
         A list with:
@@ -711,12 +466,13 @@ def pretrained_vgg16BN(in_shape: tuple,
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
 
-    return eddl.Model([in_], [out_]), False, layer2init
+    return eddl.Model([in_], [out_]), not pretrained, layer2init
 
 
-def pretrained_vgg19(in_shape: tuple,
-                     num_classes: int,
-                     multiclass: bool) -> list:
+def vgg19(in_shape: tuple,
+          num_classes: int,
+          multiclass: bool,
+          pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG19 to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -727,6 +483,8 @@ def pretrained_vgg19(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
+
+        pretrained: If True uses the pretrained weights with imagenet.
 
     Returns:
         A list with:
@@ -768,12 +526,13 @@ def pretrained_vgg19(in_shape: tuple,
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
 
-    return eddl.Model([in_], [out_]), False, layer2init
+    return eddl.Model([in_], [out_]), not pretrained, layer2init
 
 
-def pretrained_vgg19BN(in_shape: tuple,
-                       num_classes: int,
-                       multiclass: bool) -> list:
+def vgg19BN(in_shape: tuple,
+            num_classes: int,
+            multiclass: bool,
+            pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG19 with BN to extract the convolutional block and then
     append a new densely connected part to do the classification.
@@ -784,6 +543,8 @@ def pretrained_vgg19BN(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
+
+        pretrained: If True uses the pretrained weights with imagenet.
 
     Returns:
         A list with:
@@ -825,7 +586,7 @@ def pretrained_vgg19BN(in_shape: tuple,
     # This layers must be initialized because they are not pretrained
     layer2init = ["dense1", "dense2", "dense_out"]
 
-    return eddl.Model([in_], [out_]), False, layer2init
+    return eddl.Model([in_], [out_]), not pretrained, layer2init
 
 
 def get_model(model_name: str, in_shape: tuple, num_classes: int, multiclass: bool) -> list:
@@ -862,39 +623,49 @@ def get_model(model_name: str, in_shape: tuple, num_classes: int, multiclass: bo
     if model_name == "model_4":
         return model_4(in_shape, num_classes, multiclass)
 
-    # ResNet models (from scratch)
+    # ResNet models (not pretrained)
     if model_name == "ResNet18":
-        return resnet_18(in_shape, num_classes, multiclass)
+        return resnet(in_shape, num_classes, "18", multiclass, False)
     if model_name == "ResNet34":
-        return resnet_34(in_shape, num_classes, multiclass)
+        return resnet(in_shape, num_classes, "34", multiclass, False)
     if model_name == "ResNet50":
-        return resnet_50(in_shape, num_classes, multiclass)
+        return resnet(in_shape, num_classes, "50", multiclass, False)
     if model_name == "ResNet101":
-        return resnet_101(in_shape, num_classes, multiclass)
+        return resnet(in_shape, num_classes, "101", multiclass, False)
     if model_name == "ResNet152":
-        return resnet_152(in_shape, num_classes, multiclass)
+        return resnet(in_shape, num_classes, "152", multiclass, False)
 
     # ResNet models (pretrained from ONNX)
     if model_name == "Pretrained_ResNet18":
-        return pretrained_resnet(in_shape, num_classes, "18", multiclass)
+        return resnet(in_shape, num_classes, "18", multiclass, True)
     if model_name == "Pretrained_ResNet34":
-        return pretrained_resnet(in_shape, num_classes, "34", multiclass)
+        return resnet(in_shape, num_classes, "34", multiclass, True)
     if model_name == "Pretrained_ResNet50":
-        return pretrained_resnet(in_shape, num_classes, "50", multiclass)
+        return resnet(in_shape, num_classes, "50", multiclass, True)
     if model_name == "Pretrained_ResNet101":
-        return pretrained_resnet(in_shape, num_classes, "101", multiclass)
+        return resnet(in_shape, num_classes, "101", multiclass, True)
     if model_name == "Pretrained_ResNet152":
-        return pretrained_resnet(in_shape, num_classes, "152", multiclass)
+        return resnet(in_shape, num_classes, "152", multiclass, True)
 
-    # VGG models
+    # VGG models (not pretrained)
+    if model_name == "VGG16":
+        return vgg16(in_shape, num_classes, multiclass, False)
+    if model_name == "VGG16BN":
+        return vgg16BN(in_shape, num_classes, multiclass, False)
+    if model_name == "VGG19":
+        return vgg19(in_shape, num_classes, multiclass, False)
+    if model_name == "VGG19BN":
+        return vgg19BN(in_shape, num_classes, multiclass, False)
+
+    # VGG models (pretrained from ONNX)
     if model_name == "Pretrained_VGG16":
-        return pretrained_vgg16(in_shape, num_classes, multiclass)
+        return vgg16(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG16BN":
-        return pretrained_vgg16BN(in_shape, num_classes, multiclass)
+        return vgg16BN(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG19":
-        return pretrained_vgg19(in_shape, num_classes, multiclass)
+        return vgg19(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG19BN":
-        return pretrained_vgg19BN(in_shape, num_classes, multiclass)
+        return vgg19BN(in_shape, num_classes, multiclass, True)
 
     raise Exception("Wrong model name provided!")
 
