@@ -439,7 +439,8 @@ def train(model: eddl.Model,
 def test(model: eddl.Model,
          dataset: ecvl.DLDataset,
          args: argparse.Namespace,
-         out_filename: str = "test_res.json") -> dict:
+         out_filename: str = "test_res.json",
+         store_results: bool = True) -> dict:
     """
     Performs the model evaluation with the test split.
 
@@ -453,6 +454,8 @@ def test(model: eddl.Model,
 
         out_filename: Name of the JSON file to create inside the experiment
                       folder with the test results
+
+        store_results: If True stores the test results in the experiment folder
 
     Returns:
         A dictionary with a summary of the testing phase.
@@ -532,7 +535,8 @@ def test(model: eddl.Model,
     history["report"] = report
 
     # Save the tests results in a JSON file
-    with open(os.path.join(args.exp_path, out_filename), 'w') as fstream:
-        json.dump(history, fstream, indent=4, sort_keys=True)
+    if store_results:
+        with open(os.path.join(args.exp_path, out_filename), 'w') as fstream:
+            json.dump(history, fstream, indent=4, sort_keys=True)
 
     return history
