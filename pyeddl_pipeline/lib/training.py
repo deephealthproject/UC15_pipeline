@@ -6,6 +6,7 @@ import argparse
 import random
 import time
 import json
+import statistics
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,37 @@ from sklearn.metrics import classification_report
 from tqdm import tqdm
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
-from pyeddl.tensor import Tensor
+
+
+#########
+# Utils #
+#########
+
+
+def get_losses_and_metrics(args: argparse.Namespace) -> tuple:
+    """
+    Creates the vectors of losses and metrics to build the model.
+
+    Args:
+        args: The argparse object with all the configuration data like:
+              batch_size, epochs...
+
+    Returns:
+        A tuple (losses, metrics) where:
+            - losses: Vector of strings with the name of the losses
+            - metrics: Vector of strings with the name of the metrics
+    """
+    if args.binary_loss:
+        losses = ["binary_cross_entropy"]
+    elif args.multiclass:
+        losses = ["mse"]
+    else:
+        losses = ["softmax_cross_entropy"]
+
+    metrics = ['binary_accuracy'] if args.binary_loss else ['accuracy']
+
+    return (losses, metrics)
+
 
 #####################
 # Data Augmentation #
@@ -267,8 +298,19 @@ def train(model: eddl.Model,
     n_val_samples = len(dataset.GetSplit(ecvl.SplitType.validation))
     n_val_batches = n_val_samples // args.batch_size
 
+    # Get the names of the output layers of the model
+    lout_names = [lout.name for lout in eddl.getOut(model)]
+
     # To store and return the training results
-    metrics_names = ["loss", "acc", "val_loss", "val_acc"]
+    if args.binary_loss:
+        metrics_names = []
+        for lname in lout_names:
+            metrics_names.append(f"loss_{lname}")
+            metrics_names.append(f"acc_{lname}")
+            metrics_names.append(f"val_loss_{lname}")
+            metrics_names.append(f"val_acc_{lname}")
+    else:
+        metrics_names = ["loss", "acc", "val_loss", "val_acc"]
     history = {metric: [] for metric in metrics_names}
     best_loss = float('inf')  # To track the best model
     best_acc = 0.0
@@ -327,24 +369,47 @@ def train(model: eddl.Model,
             vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
+            if args.binary_loss:
+                aux_y = []
+                # We have to split the labels to tensors with one label
+                for label_idx in range(y.shape[1]):
+                    aux_y.append(y.select([":", f"{label_idx}"]))
+            else:
+                aux_y = [y]
             # Perform training with batch: forward and backward
             train_start = time.perf_counter()
-            eddl.train_batch(model, [x], [y])
+            eddl.train_batch(model, [x], aux_y)
             train_end = time.perf_counter()
             train_time += train_end - train_start
             # Get current metrics
             losses = eddl.get_losses(model)
             metrics = eddl.get_metrics(model)
             # Log in the progress bar
-            pbar.set_description(
-                f"Training[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
+            if args.binary_loss:
+                desc = "Training["
+                for i, (lname, loss_val) in enumerate(zip(lout_names, losses)):
+                    desc += f"loss_{lname}={loss_val:.4f}, "
+                for i, (lname, acc_val) in enumerate(zip(lout_names, metrics)):
+                    desc += f"acc_{lname}={acc_val:.4f}"
+                    if i < len(metrics)-1:
+                        desc += ", "
+                desc += "]"
+                pbar.set_description(desc)
+            else:
+                pbar.set_description(
+                    f"Training[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
                               "batches_queue": f"{dataset.GetQueueSize()}",
                               "avg_train_time": f"{train_time / batch:.3f}s"})
 
         # Save the epoch results of the train split
-        history["loss"].append(losses[0])
-        history["acc"].append(metrics[0])
+        if args.binary_loss:
+            for i, lout_name in enumerate(lout_names):
+                history[f"loss_{lout_name}"].append(losses[i])
+                history[f"acc_{lout_name}"].append(metrics[i])
+        else:
+            history["loss"].append(losses[0])
+            history["acc"].append(metrics[0])
 
         dataset.Stop()  # Join worker threads
 
@@ -369,31 +434,63 @@ def train(model: eddl.Model,
             vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
+            if args.binary_loss:
+                aux_y = []
+                # We have to split the labels to tensors with one label
+                for label_idx in range(y.shape[1]):
+                    aux_y.append(y.select([":", f"{label_idx}"]))
+            else:
+                aux_y = [y]
             # Perform forward computations
             eval_start = time.perf_counter()
-            eddl.eval_batch(model, [x], [y])
+            eddl.eval_batch(model, [x], aux_y)
             eval_end = time.perf_counter()
             eval_time += eval_end - eval_start
             # Get current metrics
             losses = eddl.get_losses(model)
             metrics = eddl.get_metrics(model)
             # Log in the progress bar
-            pbar.set_description(
-                f"Validation[val_loss={losses[0]:.4f}, val_acc={metrics[0]:.4f}]")
+            if args.binary_loss:
+                desc = "Validation["
+                for i, (lname, loss_val) in enumerate(zip(lout_names, losses)):
+                    desc += f"val_loss_{lname}={loss_val:.4f}, "
+                for i, (lname, acc_val) in enumerate(zip(lout_names, metrics)):
+                    desc += f"val_acc_{lname}={acc_val:.4f}"
+                    if i < len(metrics)-1:
+                        desc += ", "
+                desc += "]"
+                pbar.set_description(desc)
+            else:
+                pbar.set_description(
+                    f"Validation[val_loss={losses[0]:.4f}, val_acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
                               "batches_queue": f"{dataset.GetQueueSize()}",
                               "avg_eval_time": f"{eval_time / batch:.3f}s"})
 
         # Save the epoch results of the validation split
-        history["val_loss"].append(losses[0])
-        history["val_acc"].append(metrics[0])
+        if args.binary_loss:
+            for i, lout_name in enumerate(lout_names):
+                history[f"val_loss_{lout_name}"].append(losses[i])
+                history[f"val_acc_{lout_name}"].append(metrics[i])
+        else:
+            history["val_loss"].append(losses[0])
+            history["val_acc"].append(metrics[0])
+
+        # In case of having multiclass classification and multiple output
+        # layers we compute the average of the metrics to get a single value
+        if args.multiclass and args.binary_loss:
+            epoch_loss = statistics.mean(losses)
+            epoch_acc = statistics.mean(metrics)
+        else:
+            epoch_loss = losses[0]
+            epoch_acc = metrics[0]
 
         # Save the best models by val_loss and val_acc to ONNX
-        new_best_loss = losses[0] < best_loss
-        new_best_acc = metrics[0] > best_acc
+        new_best_loss = epoch_loss < best_loss
+        new_best_acc = epoch_acc > best_acc
         if new_best_loss and new_best_acc:
-            best_loss = losses[0]
-            best_acc = metrics[0]
+            best_loss = epoch_loss
+            best_acc = epoch_acc
             model_name = (f"{exp_name}_epoch-{epoch}_"
                           f"loss-{best_loss:.4f}_acc-{best_acc:.4f}_"
                           "by-loss-and-acc.onnx")
@@ -404,8 +501,8 @@ def train(model: eddl.Model,
             history["best_model_byloss"] = model_path
             history["best_model_byacc"] = model_path
         elif new_best_acc:
-            aux_loss = losses[0]
-            best_acc = metrics[0]
+            aux_loss = epoch_loss
+            best_acc = epoch_acc
             model_name = (f"{exp_name}_epoch-{epoch}_"
                           f"loss-{aux_loss:.4f}_acc-{best_acc:.4f}_"
                           "by-acc.onnx")
@@ -414,8 +511,8 @@ def train(model: eddl.Model,
             eddl.save_net_to_onnx_file(model, model_path)
             history["best_model_byacc"] = model_path
         elif new_best_loss:
-            best_loss = losses[0]
-            aux_acc = metrics[0]
+            best_loss = epoch_loss
+            aux_acc = epoch_acc
             model_name = (f"{exp_name}_epoch-{epoch}_"
                           f"loss-{best_loss:.4f}_acc-{aux_acc:.4f}_"
                           "by-loss.onnx")
@@ -468,8 +565,18 @@ def test(model: eddl.Model,
     n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
     n_test_batches = n_test_samples // args.batch_size
 
+    # Get the names of the output layers of the model
+    lout_names = [lout.name for lout in eddl.getOut(model)]
+
     # To store and return the testing results
-    history = {"loss": -1, "acc": -1}
+    if args.binary_loss:
+        metrics_names = []
+        for lname in lout_names:
+            metrics_names.append(f"loss_{lname}")
+            metrics_names.append(f"acc_{lname}")
+    else:
+        metrics_names = ["loss", "acc"]
+    history = {metric: -1 for metric in metrics_names}
 
     # Prepare dataset
     dataset.SetSplit(ecvl.SplitType.test)
@@ -492,13 +599,23 @@ def test(model: eddl.Model,
         vsamples, x, y = dataset.GetBatch()
         load_end = time.perf_counter()
         load_time += load_end - load_start
+        #print(f'[DEBUG] Loaded y: {y.getdata()}')
+        if args.binary_loss:
+            aux_y = []
+            # We have to split the labels to tensors with one label
+            for label_idx in range(y.shape[1]):
+                aux_y.append(y.select([":", f"{label_idx}"]))
+        else:
+            aux_y = [y]
+        #print(f'[DEBUG] Ready aux_y: {[t.getdata() for t in aux_y]}')
         # Perform forward computations
         test_start = time.perf_counter()
-        eddl.eval_batch(model, [x], [y])
+        eddl.eval_batch(model, [x], aux_y)
         test_end = time.perf_counter()
         test_time += test_end - test_start
         # Store the predictions to compute statistics later
         batch_logits = eddl.getOutput(eddl.getOut(model)[0]).getdata()
+        #print(f'[DEBUG] batch_logits (first output layer): {batch_logits}')
         if args.multiclass:
             batch_preds = np.where(batch_logits > 0.5, 1, 0)
             batch_targets = y.getdata()
@@ -515,8 +632,19 @@ def test(model: eddl.Model,
         losses = eddl.get_losses(model)
         metrics = eddl.get_metrics(model)
         # Log in the progress bar
-        pbar.set_description(
-            f"Test[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
+        if args.binary_loss:
+            desc = "Test["
+            for i, (lname, loss_val) in enumerate(zip(lout_names, losses)):
+                desc += f"loss_{lname}={loss_val:.4f}, "
+            for i, (lname, acc_val) in enumerate(zip(lout_names, metrics)):
+                desc += f"acc_{lname}={acc_val:.4f}"
+                if i < len(metrics)-1:
+                    desc += ", "
+            desc += "]"
+            pbar.set_description(desc)
+        else:
+            pbar.set_description(
+                f"Test[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
         pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
                           "batches_queue": f"{dataset.GetQueueSize()}",
                           "avg_test_time": f"{test_time / batch:.3f}s"})
@@ -524,14 +652,23 @@ def test(model: eddl.Model,
     dataset.Stop()  # Join worker threads
 
     # Compute a report with statistics for each target class
+    #print(f'[DEBUG] targets shape: {targets.shape}')
+    #print(f'[DEBUG] preds shape: {preds.shape}')
+    #print(f'[DEBUG] targets[:5]: {targets[:5]}')
+    #print(f'[DEBUG] preds[:5]: {preds[:5]}')
     report = classification_report(targets,
                                    preds,
                                    target_names=dataset.classes_,
                                    output_dict=True)
 
     # Save test results
-    history["loss"] = losses[0]
-    history["acc"] = metrics[0]
+    if args.binary_loss:
+        for i, lout_name in enumerate(lout_names):
+            history[f"loss_{lout_name}"] = losses[i]
+            history[f"acc_{lout_name}"] = metrics[i]
+    else:
+        history["loss"] = losses[0]
+        history["acc"] = metrics[0]
     history["report"] = report
 
     # Save the tests results in a JSON file

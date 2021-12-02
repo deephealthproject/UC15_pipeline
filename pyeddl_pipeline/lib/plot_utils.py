@@ -23,11 +23,16 @@ def plot_training_results(history: dict, exp_path: str):
     exp_plots_path = os.path.join(exp_path, "plots")
     os.makedirs(exp_plots_path, exist_ok=True)
 
-    for name, metric in ("accuracy", "acc"), ("loss", "loss"):
+    metrics = []
+    for m in history.keys():
+        if m.startswith("loss") or m.startswith("acc"):
+            metrics.append(m)
+
+    for metric in metrics:
         plt.plot(history[metric], label="train")
         plt.plot(history["val_"+metric], label="val")
-        plt.title(f"Training {name}")
-        plt.ylabel(name)
+        plt.title(f"Training {metric}")
+        plt.ylabel(metric)
         plt.xlabel("epoch")
         n_epochs = len(history[metric])
         if n_epochs > 15:
@@ -35,7 +40,7 @@ def plot_training_results(history: dict, exp_path: str):
         else:
             plt.xticks(range(n_epochs))
         plt.legend()
-        plt.savefig(os.path.join(exp_plots_path, f"{name}.png"))
+        plt.savefig(os.path.join(exp_plots_path, f"{metric}.png"))
         plt.clf()  # Clear figure for the next plot
 
 

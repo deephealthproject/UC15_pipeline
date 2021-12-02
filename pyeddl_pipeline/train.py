@@ -9,7 +9,8 @@ from datetime import datetime
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 
-from lib.training import get_augmentations, get_optimizer, apply_regularization
+from lib.training import get_augmentations, get_optimizer
+from lib.training import get_losses_and_metrics, apply_regularization
 from lib.training import train, test
 from lib.models import get_model, get_model_tl
 from lib.plot_utils import plot_training_results
@@ -38,6 +39,7 @@ def main(args):
     num_classes = len(dataset.classes_)
     args.in_shape = in_shape
     args.num_classes = num_classes
+    args.classes = dataset.classes_
     # Get the full dataset configuration to log it in the experiment logs
     dataset_config_file = args.yaml_path[:-5] + "_args.json"
     if not os.path.isfile(dataset_config_file):
@@ -67,7 +69,8 @@ def main(args):
         model, args.init_weights, args.layers2init = get_model(args.model,
                                                                in_shape,
                                                                num_classes,
-                                                               args.multiclass)
+                                                               args.multiclass,
+                                                               args.classes if args.binary_loss else [])
 
     if args.regularization:
         print(f"Going to apply {args.regularization} regularization to the model")
@@ -82,11 +85,19 @@ def main(args):
     else:
         comp_serv = eddl.CS_GPU(args.gpus, 1, args.mem_level)
 
+    losses, metrics = get_losses_and_metrics(args)
+
+    if args.binary_loss:
+        # Set as many losses and metrics as number of classes
+        # Note: The model will have 'num_classes' output layers
+        losses *= num_classes
+        metrics *= num_classes
+
     # Build the model
     eddl.build(model,
                opt,
-               ["mse"] if args.multiclass else ["softmax_cross_entropy"],
-               ['accuracy'],
+               losses,
+               metrics,
                comp_serv,
                args.init_weights)
 
@@ -165,10 +176,18 @@ def main(args):
         else:
             comp_serv = eddl.CS_GPU(args.gpus, 1, args.mem_level)
 
+        losses, metrics = get_losses_and_metrics(args)
+
+        if args.binary_loss:
+            # Set as many losses and metrics as number of classes
+            # Note: The model will have 'num_classes' output layers
+            losses *= num_classes
+            metrics *= num_classes
+
         eddl.build(best_model,
                    opt,
-                   ["softmax_cross_entropy"],
-                   ['accuracy'],
+                   losses,
+                   metrics,
                    comp_serv,
                    False)  # Avoid weights initialization
 
@@ -179,8 +198,16 @@ def main(args):
                             f"test_res_{model_name}.json")
         # Show tests results
         print(f"\nTest results of '{model_name}':")
-        print(f"  - loss={test_results['loss']:.4f}")
-        print(f"  - acc={test_results['acc']:.4f}")
+        if args.binary_loss:
+            test_metrics = []
+            for m in test_results.keys():
+                if m.startswith("loss") or m.startswith("acc"):
+                    test_metrics.append(m)
+            for metric in test_metrics:
+                print(f"  - {metric}={test_results[metric]:.4f}")
+        else:
+            print(f"  - loss={test_results['loss']:.4f}")
+            print(f"  - acc={test_results['acc']:.4f}")
         print("\nTest report:")
         print(json.dumps(test_results['report'], indent=4))
 
@@ -255,6 +282,13 @@ if __name__ == "__main__":
         "--multiclass",
         help=("Prepares the pipeline for multiclass classification, "
               "using sigmoid in the output layer"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--binary-loss",
+        help=("Changes the model to have as many output layers as classes"
+              " (with one output neuron) to be able to use binary cross "
+              " entropy for every class"),
         action="store_true")
 
     arg_parser.add_argument(

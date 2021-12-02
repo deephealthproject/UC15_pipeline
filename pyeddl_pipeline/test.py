@@ -86,6 +86,12 @@ if __name__ == "__main__":
         action="store_true")
 
     arg_parser.add_argument(
+        "--binary-loss",
+        help=("Prepares the pipeline for models with as many output layers as"
+              " classes (with one output neuron)"),
+        action="store_true")
+
+    arg_parser.add_argument(
         "--onnx-files",
         help="A list of paths to the ONNX files to use for testing",
         metavar="onnx_path",
