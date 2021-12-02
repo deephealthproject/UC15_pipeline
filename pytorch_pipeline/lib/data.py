@@ -253,4 +253,4 @@ class COVIDDataModule(pl.LightningDataModule):
                                            shuffle=False,
                                            num_workers=self.num_workers,
                                            pin_memory=self.pin_memory,
-                                           drop_last=self.drop_last)
+                                           drop_last=False)
