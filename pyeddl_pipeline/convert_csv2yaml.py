@@ -29,6 +29,13 @@ def main(args):
     # Join the dataframes
     full_df = pd.concat([train_df, val_df, test_df], ignore_index=True)
 
+    # Filter samples that match the filepath with the regex filter
+    if args.regex:
+        print(f"Going to filter the samples with the regex '{args.regex}'")
+        print(f"Samples before filtering: {len(full_df.index)}")
+        full_df = full_df[full_df.filepath.str.contains(args.regex)]
+        print(f"Samples after filtering: {len(full_df.index)}")
+
     labels_not_used = set(args.all_labels).difference(set(args.target_labels))
 
     # Prepare the list of labels for each sample
@@ -125,5 +132,10 @@ if __name__ == '__main__':
                             help=("The samples without any label set to 1 are"
                                   " labeled as 'normal'"),
                             action="store_true")
+
+    arg_parser.add_argument("--regex",
+                            help="Regular expresion to filter the samples by filepath",
+                            default="",
+                            type=str)
 
     main(arg_parser.parse_args())
