@@ -121,7 +121,8 @@ if __name__ == "__main__":
 
     arg_parser.add_argument(
         "--rgb",
-        help="Load the images in RGB format instead of grayscale",
+        help=("Load the images in RGB format instead of grayscale. If the "
+              "image is grayscale the single channel is replicated two times"),
         action="store_true")
 
     arg_parser.add_argument(
