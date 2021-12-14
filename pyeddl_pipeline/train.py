@@ -248,20 +248,21 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--frozen-epochs",
         help=("In case of using a pretrained model, this param sets the "
-              "number of epochs with the pretrained weights frozen."),
+              "number of epochs with the pretrained weights frozen"),
         default=5,
         type=int)
 
     arg_parser.add_argument(
         "--augmentations", "-augs",
-        help="Set of augmentations to select",
+        help="Version of data augmentation to use",
         default="0.0",
         choices=["0.0", "1.0", "1.1", "2.0"],
         type=str)
 
     arg_parser.add_argument(
         "--rgb",
-        help="Load the images in RGB format instead of grayscale",
+        help=("Load the images in RGB format instead of grayscale. If the "
+              "image is grayscale the single channel is replicated two times"),
         action="store_true")
 
     arg_parser.add_argument(

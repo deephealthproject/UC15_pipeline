@@ -28,6 +28,7 @@ def plot_training_results(history: dict, exp_path: str):
         if m.startswith("loss") or m.startswith("acc"):
             metrics.append(m)
 
+    plt.ioff()  # Disable interactive mode
     for metric in metrics:
         plt.plot(history[metric], label="train")
         plt.plot(history["val_"+metric], label="val")
