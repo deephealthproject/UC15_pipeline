@@ -1,5 +1,5 @@
 """
-Main script to train the models.
+Script to run inference on test set given one or more pretrained models.
 """
 import os
 import argparse
@@ -72,7 +72,7 @@ def main(args):
 if __name__ == "__main__":
     # Get the config from the script arguments
     arg_parser = argparse.ArgumentParser(
-        description="Script to perform test with one or more models (with ensemble)",
+        description="Script to perform test inference with one or more models",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     arg_parser.add_argument(
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         "--batch-size", "-bs",
         help="Size of the training batches of data",
         type=int,
-        default=16)
+        default=3)
 
     arg_parser.add_argument(
         "--rgb",
