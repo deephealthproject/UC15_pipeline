@@ -237,7 +237,7 @@ if __name__ == "__main__":
         "--batch-size", "-bs",
         help="Size of the training batches of data",
         type=int,
-        default=16)
+        default=3)
 
     arg_parser.add_argument(
         "--epochs",
