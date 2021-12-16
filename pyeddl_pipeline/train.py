@@ -162,6 +162,11 @@ def main(args):
 
     models2test = ["best_model_byloss", "best_model_byacc"]
 
+    dataset = ecvl.DLDataset(args.yaml_path,
+                             args.batch_size,
+                             get_augmentations("0.0", args.target_size),
+                             color_type)
+
     for model_name in models2test:
         print(("\nGoing to load the model "
               f"\"{history[model_name]}\" for testing"))
