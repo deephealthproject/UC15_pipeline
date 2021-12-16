@@ -599,7 +599,6 @@ def test(model: eddl.Model,
         vsamples, x, y = dataset.GetBatch()
         load_end = time.perf_counter()
         load_time += load_end - load_start
-        #print(f'[DEBUG] Loaded y: {y.getdata()}')
         if args.binary_loss:
             aux_y = []
             # We have to split the labels to tensors with one label
@@ -607,7 +606,6 @@ def test(model: eddl.Model,
                 aux_y.append(y.select([":", f"{label_idx}"]))
         else:
             aux_y = [y]
-        #print(f'[DEBUG] Ready aux_y: {[t.getdata() for t in aux_y]}')
         # Perform forward computations
         test_start = time.perf_counter()
         eddl.eval_batch(model, [x], aux_y)
@@ -615,7 +613,6 @@ def test(model: eddl.Model,
         test_time += test_end - test_start
         # Store the predictions to compute statistics later
         batch_logits = eddl.getOutput(eddl.getOut(model)[0]).getdata()
-        #print(f'[DEBUG] batch_logits (first output layer): {batch_logits}')
         if args.multiclass:
             batch_preds = np.where(batch_logits > 0.5, 1, 0)
             batch_targets = y.getdata()
@@ -652,10 +649,6 @@ def test(model: eddl.Model,
     dataset.Stop()  # Join worker threads
 
     # Compute a report with statistics for each target class
-    #print(f'[DEBUG] targets shape: {targets.shape}')
-    #print(f'[DEBUG] preds shape: {preds.shape}')
-    #print(f'[DEBUG] targets[:5]: {targets[:5]}')
-    #print(f'[DEBUG] preds[:5]: {preds[:5]}')
     report = classification_report(targets,
                                    preds,
                                    target_names=dataset.classes_,
