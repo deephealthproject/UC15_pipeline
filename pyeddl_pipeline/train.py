@@ -280,7 +280,7 @@ if __name__ == "__main__":
                  "Pretrained_ResNet18", "Pretrained_ResNet34",
                  "Pretrained_ResNet50", "Pretrained_ResNet101",
                  "Pretrained_ResNet152",
-                 "VGG16", "VGG16BN", "VGG19", "VGG19BN"
+                 "VGG16", "VGG16BN", "VGG19", "VGG19BN",
                  "Pretrained_VGG16", "Pretrained_VGG19",
                  "Pretrained_VGG16BN", "Pretrained_VGG19BN"])
 
