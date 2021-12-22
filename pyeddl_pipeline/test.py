@@ -59,6 +59,12 @@ def main(args):
         print(f"  - loss={test_results['loss']:.4f}")
         print(f"  - acc={test_results['acc']:.4f}")
         print("\nTest report:")
+        print(f"sklearn accuracy = {test_results['sklearn_acc']}")
+        if not args.multiclass and not args.binary_loss:
+            print(f"balanced accuracy = {test_results['balanced_acc']}")
+        else:
+            print(f"Multilabel confusion matrix (classes: {dataset.classes_}):")
+            print(test_results['multilabel_confmat'])
         print(json.dumps(test_results['report'], indent=4))
 
         if args.out_path:
@@ -87,8 +93,9 @@ if __name__ == "__main__":
 
     arg_parser.add_argument(
         "--binary-loss",
-        help=("Prepares the pipeline for models with as many output layers as"
-              " classes (with one output neuron)"),
+        help=("Changes the pipeline to use binary cross entropy as loss "
+              "function enabling multiclass classification. The loss and "
+              "metrics are computed for each unit(class) of the output layer"),
         action="store_true")
 
     arg_parser.add_argument(
