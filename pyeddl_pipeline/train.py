@@ -69,8 +69,7 @@ def main(args):
         model, args.init_weights, args.layers2init = get_model(args.model,
                                                                in_shape,
                                                                num_classes,
-                                                               args.multiclass,
-                                                               args.classes if args.binary_loss else [])
+                                                               args.multiclass or args.binary_loss)
 
     if args.regularization:
         print(f"Going to apply {args.regularization} regularization to the model")
@@ -87,11 +86,9 @@ def main(args):
 
     losses, metrics = get_losses_and_metrics(args)
 
-    if args.binary_loss:
-        # Set as many losses and metrics as number of classes
-        # Note: The model will have 'num_classes' output layers
-        losses *= num_classes
-        metrics *= num_classes
+    print("Going to build the model:")
+    print(f" - losses: {losses}")
+    print(f" - metrics: {metrics}")
 
     # Build the model
     eddl.build(model,
@@ -183,12 +180,6 @@ def main(args):
 
         losses, metrics = get_losses_and_metrics(args)
 
-        if args.binary_loss:
-            # Set as many losses and metrics as number of classes
-            # Note: The model will have 'num_classes' output layers
-            losses *= num_classes
-            metrics *= num_classes
-
         eddl.build(best_model,
                    opt,
                    losses,
@@ -203,17 +194,15 @@ def main(args):
                             f"test_res_{model_name}.json")
         # Show tests results
         print(f"\nTest results of '{model_name}':")
-        if args.binary_loss:
-            test_metrics = []
-            for m in test_results.keys():
-                if m.startswith("loss") or m.startswith("acc"):
-                    test_metrics.append(m)
-            for metric in test_metrics:
-                print(f"  - {metric}={test_results[metric]:.4f}")
-        else:
-            print(f"  - loss={test_results['loss']:.4f}")
-            print(f"  - acc={test_results['acc']:.4f}")
+        print(f"  - loss={test_results['loss']:.4f}")
+        print(f"  - acc={test_results['acc']:.4f}")
         print("\nTest report:")
+        print(f"sklearn accuracy = {test_results['sklearn_acc']}")
+        if not args.multiclass and not args.binary_loss:
+            print(f"balanced accuracy = {test_results['balanced_acc']}")
+        else:
+            print(f"Multilabel confusion matrix (classes: {dataset.classes_}):")
+            print(test_results['multilabel_confmat'])
         print(json.dumps(test_results['report'], indent=4))
 
         del best_model  # Free the memory for the next model
@@ -287,14 +276,14 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--multiclass",
         help=("Prepares the pipeline for multiclass classification, "
-              "using sigmoid in the output layer"),
+              "using sigmoid in the output layer and MSE loss function"),
         action="store_true")
 
     arg_parser.add_argument(
         "--binary-loss",
-        help=("Changes the model to have as many output layers as classes"
-              " (with one output neuron) to be able to use binary cross "
-              " entropy for every class"),
+        help=("Changes the pipeline to use binary cross entropy as loss "
+              "function enabling multiclass classification. The loss and "
+              "metrics are computed for each unit(class) of the output layer"),
         action="store_true")
 
     arg_parser.add_argument(

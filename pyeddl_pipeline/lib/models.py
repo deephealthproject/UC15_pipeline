@@ -1,10 +1,6 @@
 """
 Module to create the models architectures.
 """
-import os
-from typing import Callable
-import urllib.request
-
 import pyeddl.eddl as eddl
 
 
@@ -39,8 +35,7 @@ def conv_bn_relu(in_layer,  # A EDDL layer
 # CUSTOM MODELS #
 #################
 
-def model_1(in_shape: tuple, num_classes: int,
-            multiclass: bool, binary_outputs: list) -> list:
+def model_1(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
     """
     Creates an EDDL model with the topology 'model_1'
 
@@ -50,11 +45,6 @@ def model_1(in_shape: tuple, num_classes: int,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
     Returns:
         A list with:
@@ -83,24 +73,16 @@ def model_1(in_shape: tuple, num_classes: int,
     l = eddl.MaxPool2D(l, [2, 2])
     l = eddl.Flatten(l)
     l = eddl.ReLu(eddl.Dense(l, 512))
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l = eddl.Dense(parent_layer, 1)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    l = eddl.Dense(l, num_classes)
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l = eddl.Dense(l, num_classes)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), True, []
 
 
-def model_2(in_shape: tuple, num_classes: int,
-            multiclass: bool, binary_outputs: list) -> list:
+def model_2(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
     """
     Creates an EDDL model with the topology 'model_2'
 
@@ -110,11 +92,6 @@ def model_2(in_shape: tuple, num_classes: int,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
     Returns:
         A list with:
@@ -145,24 +122,16 @@ def model_2(in_shape: tuple, num_classes: int,
     l = eddl.GlobalAveragePool2D(l)
     l = eddl.Flatten(l)
     l = eddl.ReLu(eddl.Dense(l, 128))
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l = eddl.Dense(parent_layer, 1)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    l = eddl.Dense(l, num_classes)
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l = eddl.Dense(l, num_classes)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), True, []
 
 
-def model_3(in_shape: tuple, num_classes: int,
-        multiclass: bool, binary_outputs: list) -> list:
+def model_3(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
     """
     Creates an EDDL model with the topology 'model_3'
 
@@ -172,11 +141,6 @@ def model_3(in_shape: tuple, num_classes: int,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
     Returns:
         A list with:
@@ -228,23 +192,16 @@ def model_3(in_shape: tuple, num_classes: int,
     conv_out = eddl.Flatten(block7)
 
     dense1 = eddl.ReLu(eddl.Dense(conv_out, 128))
-    if binary_outputs:
-        outs_ = []
-        for out_name in binary_outputs:
-            l = eddl.Dense(dense1, 1)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    l = eddl.Dense(dense1, num_classes)
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l = eddl.Dense(dense1, num_classes)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), True, []
 
 
-def model_4(in_shape: tuple, num_classes: int,
-            multiclass: bool, binary_outputs: list) -> list:
+def model_4(in_shape: tuple, num_classes: int, multiclass: bool) -> list:
     """
     Creates an EDDL model with the topology 'model_4'
 
@@ -254,11 +211,6 @@ def model_4(in_shape: tuple, num_classes: int,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
     Returns:
         A list with:
@@ -320,17 +272,11 @@ def model_4(in_shape: tuple, num_classes: int,
 
     drop = eddl.Dropout(conv_out, 0.4)
     dense1 = eddl.ReLu(eddl.Dense(drop, 1024))
-    if binary_outputs:
-        outs_ = []
-        for out_name in binary_outputs:
-            l = eddl.Dense(dense1, 1)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    l = eddl.Dense(dense1, num_classes)
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l = eddl.Dense(dense1, num_classes)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), True, []
 
@@ -339,7 +285,6 @@ def resnet(in_shape: tuple,
            num_classes: int,
            version: str,
            multiclass: bool,
-           binary_outputs: list,
            pretrained: bool = True) -> list:
     """
     Uses a pretrained ResNet to extract the convolutional block and then
@@ -354,11 +299,6 @@ def resnet(in_shape: tuple,
                  Versions available: "18", "34", "50", "101" and "152"
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
         pretrained: If True uses the pretrained weights with imagenet.
 
@@ -392,29 +332,16 @@ def resnet(in_shape: tuple,
     l = eddl.getLayer(pretrained_model, "top")
 
     # Create the new densely connected part
+    layers2init = ["dense1", "dense_out"]
     input_units = l.output.shape[-1]
-    l = eddl.Dense(l, input_units // 2, name="dense1")
+    l = eddl.Dense(l, input_units // 2, name=layers2init[0])
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.4, name="dense1_dropout")
-
-    layers2init = ["dense1"]
-
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l_name = f"dense_{out_name}"
-            layers2init.append(l_name)
-            l = eddl.Dense(parent_layer, 1, name=l_name)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    l = eddl.Dense(l, num_classes, name=layers2init[1])
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l_name = "dense_out"
-        layers2init.append(l_name)
-        l = eddl.Dense(l, num_classes, name=l_name)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), not pretrained, layers2init
 
@@ -422,7 +349,6 @@ def resnet(in_shape: tuple,
 def vgg16(in_shape: tuple,
           num_classes: int,
           multiclass: bool,
-          binary_outputs: list,
           pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG16 to extract the convolutional block and then
@@ -434,11 +360,6 @@ def vgg16(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
         pretrained: If True uses the pretrained weights with imagenet.
 
@@ -462,36 +383,24 @@ def vgg16(in_shape: tuple,
     # Get the reference to the last layer of the pretrained conv block
     l = eddl.getLayer(pretrained_model, "top")
 
+    # This layers must be initialized because they are not pretrained
+    layers2init = ["dense1", "dense2", "dense_out"]
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, 4096, name="dense1")
+    l = eddl.Dense(l, 4096, name=layers2init[0])
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, 4096, name="dense2")
+    l = eddl.Dense(l, 4096, name=layers2init[1])
     l = eddl.ReLu(l, name="dense2_relu")
     l = eddl.Dropout(l, 0.4, name="dense2_dropout")
-
-    # This layers must be initialized because they are not pretrained
-    layers2init = ["dense1", "dense2"]
-
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l_name = f"dense_{out_name}"
-            layers2init.append(l_name)
-            l = eddl.Dense(parent_layer, 1, name=l_name)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    # Dense output
+    l = eddl.Dense(l, num_classes, name=layers2init[2])
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l_name = "dense_out"
-        layers2init.append(l_name)
-        l = eddl.Dense(l, num_classes, name=l_name)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), not pretrained, layers2init
 
@@ -499,7 +408,6 @@ def vgg16(in_shape: tuple,
 def vgg16BN(in_shape: tuple,
             num_classes: int,
             multiclass: bool,
-            binary_outputs: list,
             pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG16 with BN to extract the convolutional block and then
@@ -511,11 +419,6 @@ def vgg16BN(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
         pretrained: If True uses the pretrained weights with imagenet.
 
@@ -539,36 +442,24 @@ def vgg16BN(in_shape: tuple,
     # Get the reference to the last layer of the pretrained conv block
     l = eddl.getLayer(pretrained_model, "top")
 
+    # This layers must be initialized because they are not pretrained
+    layers2init = ["dense1", "dense2", "dense_out"]
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, 4096, name="dense1")
+    l = eddl.Dense(l, 4096, name=layers2init[0])
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, 4096, name="dense2")
+    l = eddl.Dense(l, 4096, name=layers2init[1])
     l = eddl.ReLu(l, name="dense2_relu")
     l = eddl.Dropout(l, 0.4, name="dense2_dropout")
-
-    # This layers must be initialized because they are not pretrained
-    layers2init = ["dense1", "dense2"]
-
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l_name = f"dense_{out_name}"
-            layers2init.append(l_name)
-            l = eddl.Dense(parent_layer, 1, name=l_name)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    # Dense output
+    l = eddl.Dense(l, num_classes, name=layers2init[2])
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l_name = "dense_out"
-        layers2init.append(l_name)
-        l = eddl.Dense(l, num_classes, name=l_name)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), not pretrained, layers2init
 
@@ -576,7 +467,6 @@ def vgg16BN(in_shape: tuple,
 def vgg19(in_shape: tuple,
           num_classes: int,
           multiclass: bool,
-          binary_outputs: list,
           pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG19 to extract the convolutional block and then
@@ -588,11 +478,6 @@ def vgg19(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
         pretrained: If True uses the pretrained weights with imagenet.
 
@@ -616,36 +501,24 @@ def vgg19(in_shape: tuple,
     # Get the reference to the last layer of the pretrained conv block
     l = eddl.getLayer(pretrained_model, "top")
 
+    # This layers must be initialized because they are not pretrained
+    layers2init = ["dense1", "dense2", "dense_out"]
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, 4096, name="dense1")
+    l = eddl.Dense(l, 4096, name=layers2init[0])
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, 4096, name="dense2")
+    l = eddl.Dense(l, 4096, name=layers2init[1])
     l = eddl.ReLu(l, name="dense2_relu")
     l = eddl.Dropout(l, 0.4, name="dense2_dropout")
-
-    # This layers must be initialized because they are not pretrained
-    layers2init = ["dense1", "dense2"]
-
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l_name = f"dense_{out_name}"
-            layers2init.append(l_name)
-            l = eddl.Dense(parent_layer, 1, name=l_name)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    # Dense output
+    l = eddl.Dense(l, num_classes, name=layers2init[2])
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l_name = "dense_out"
-        layers2init.append(l_name)
-        l = eddl.Dense(l, num_classes, name=l_name)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), not pretrained, layers2init
 
@@ -653,7 +526,6 @@ def vgg19(in_shape: tuple,
 def vgg19BN(in_shape: tuple,
             num_classes: int,
             multiclass: bool,
-            binary_outputs: list,
             pretrained: bool = True) -> list:
     """
     Uses a pretrained VGG19 with BN to extract the convolutional block and then
@@ -665,11 +537,6 @@ def vgg19BN(in_shape: tuple,
         num_classes: Number of units for the output Dense layer.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
         pretrained: If True uses the pretrained weights with imagenet.
 
@@ -693,36 +560,24 @@ def vgg19BN(in_shape: tuple,
     # Get the reference to the last layer of the pretrained conv block
     l = eddl.getLayer(pretrained_model, "top")
 
+    # This layers must be initialized because they are not pretrained
+    layers2init = ["dense1", "dense2", "dense_out"]
     # Create the new densely connected part
     input_units = l.output.shape[-1]
     # Dense 1
-    l = eddl.Dense(l, 4096, name="dense1")
+    l = eddl.Dense(l, 4096, name=layers2init[0])
     l = eddl.ReLu(l, name="dense1_relu")
     l = eddl.Dropout(l, 0.4, name="dense1_dropout")
     # Dense 2
-    l = eddl.Dense(l, 4096, name="dense2")
+    l = eddl.Dense(l, 4096, name=layers2init[1])
     l = eddl.ReLu(l, name="dense2_relu")
     l = eddl.Dropout(l, 0.4, name="dense2_dropout")
-
-    # This layers must be initialized because they are not pretrained
-    layers2init = ["dense1", "dense2"]
-
-    if binary_outputs:
-        outs_ = []
-        parent_layer = l
-        for out_name in binary_outputs:
-            l_name = f"dense_{out_name}"
-            layers2init.append(l_name)
-            l = eddl.Dense(parent_layer, 1, name=l_name)
-            outs_.append(eddl.Sigmoid(l, name=out_name))
+    # Dense output
+    l = eddl.Dense(l, num_classes, name=layers2init[2])
+    if multiclass:
+        outs_ = [eddl.Sigmoid(l)]
     else:
-        l_name = "dense_out"
-        layers2init.append(l_name)
-        l = eddl.Dense(l, num_classes, name=l_name)
-        if multiclass:
-            outs_ = [eddl.Sigmoid(l)]
-        else:
-            outs_ = [eddl.Softmax(l)]
+        outs_ = [eddl.Softmax(l)]
 
     return eddl.Model([in_], outs_), not pretrained, layers2init
 
@@ -730,8 +585,7 @@ def vgg19BN(in_shape: tuple,
 def get_model(model_name: str,
               in_shape: tuple,
               num_classes: int,
-              multiclass: bool = False,
-              binary_outputs: list = []) -> list:
+              multiclass: bool = False) -> list:
     """
     Auxiliary function to create the selected model topology.
 
@@ -743,11 +597,6 @@ def get_model(model_name: str,
         num_classes: Number of units in the last layer for classification.
 
         multiclass: If True uses sigmoid in the output layer, else uses Softmax.
-
-        binary_outputs: If not empty, the models will have as many ouput layers
-                        (with one neuron) as elements in the list. The list
-                        must contain the names for the layers. Used for binary
-                        classification with multiple classes.
 
     Returns:
         A list with:
@@ -762,75 +611,57 @@ def get_model(model_name: str,
     """
     # Custom models
     if model_name == "model_1":
-        return model_1(in_shape, num_classes, multiclass, binary_outputs)
+        return model_1(in_shape, num_classes, multiclass)
     if model_name == "model_2":
-        return model_2(in_shape, num_classes, multiclass, binary_outputs)
+        return model_2(in_shape, num_classes, multiclass)
     if model_name == "model_3":
-        return model_3(in_shape, num_classes, multiclass, binary_outputs)
+        return model_3(in_shape, num_classes, multiclass)
     if model_name == "model_4":
-        return model_4(in_shape, num_classes, multiclass, binary_outputs)
+        return model_4(in_shape, num_classes, multiclass)
 
     # ResNet models (not pretrained)
     if model_name == "ResNet18":
-        return resnet(in_shape, num_classes, "18",
-                      multiclass, binary_outputs, False)
+        return resnet(in_shape, num_classes, "18", multiclass, False)
     if model_name == "ResNet34":
-        return resnet(in_shape, num_classes, "34",
-                      multiclass, binary_outputs, False)
+        return resnet(in_shape, num_classes, "34", multiclass, False)
     if model_name == "ResNet50":
-        return resnet(in_shape, num_classes, "50",
-                      multiclass, binary_outputs, False)
+        return resnet(in_shape, num_classes, "50", multiclass, False)
     if model_name == "ResNet101":
-        return resnet(in_shape, num_classes, "101",
-                      multiclass, binary_outputs, False)
+        return resnet(in_shape, num_classes, "101", multiclass, False)
     if model_name == "ResNet152":
-        return resnet(in_shape, num_classes, "152",
-                      multiclass, binary_outputs, False)
+        return resnet(in_shape, num_classes, "152", multiclass, False)
 
     # ResNet models (pretrained from ONNX)
     if model_name == "Pretrained_ResNet18":
-        return resnet(in_shape, num_classes, "18",
-                      multiclass, binary_outputs, True)
+        return resnet(in_shape, num_classes, "18", multiclass, True)
     if model_name == "Pretrained_ResNet34":
-        return resnet(in_shape, num_classes, "34",
-                      multiclass, binary_outputs, True)
+        return resnet(in_shape, num_classes, "34", multiclass, True)
     if model_name == "Pretrained_ResNet50":
-        return resnet(in_shape, num_classes, "50",
-                      multiclass, binary_outputs, True)
+        return resnet(in_shape, num_classes, "50", multiclass, True)
     if model_name == "Pretrained_ResNet101":
-        return resnet(in_shape, num_classes, "101",
-                      multiclass, binary_outputs, True)
+        return resnet(in_shape, num_classes, "101", multiclass, True)
     if model_name == "Pretrained_ResNet152":
-        return resnet(in_shape, num_classes, "152",
-                      multiclass, binary_outputs, True)
+        return resnet(in_shape, num_classes, "152", multiclass, True)
 
     # VGG models (not pretrained)
     if model_name == "VGG16":
-        return vgg16(in_shape, num_classes,
-                     multiclass, binary_outputs, False)
+        return vgg16(in_shape, num_classes, multiclass, False)
     if model_name == "VGG16BN":
-        return vgg16BN(in_shape, num_classes,
-                       multiclass, binary_outputs, False)
+        return vgg16BN(in_shape, num_classes, multiclass, False)
     if model_name == "VGG19":
-        return vgg19(in_shape, num_classes,
-                     multiclass, binary_outputs, False)
+        return vgg19(in_shape, num_classes, multiclass, False)
     if model_name == "VGG19BN":
-        return vgg19BN(in_shape, num_classes,
-                       multiclass, binary_outputs, False)
+        return vgg19BN(in_shape, num_classes, multiclass, False)
 
     # VGG models (pretrained from ONNX)
     if model_name == "Pretrained_VGG16":
-        return vgg16(in_shape, num_classes,
-                     multiclass, binary_outputs, True)
+        return vgg16(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG16BN":
-        return vgg16BN(in_shape, num_classes,
-                       multiclass, binary_outputs, True)
+        return vgg16BN(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG19":
-        return vgg19(in_shape, num_classes,
-                     multiclass, binary_outputs, True)
+        return vgg19(in_shape, num_classes, multiclass, True)
     if model_name == "Pretrained_VGG19BN":
-        return vgg19BN(in_shape, num_classes,
-                       multiclass, binary_outputs, True)
+        return vgg19BN(in_shape, num_classes, multiclass, True)
 
     raise Exception("Wrong model name provided!")
 
@@ -913,14 +744,13 @@ def get_model_tl(onnx_file: str,
     else:
         raise Exception("Wrong model name provided!")
 
+    # This layers must be initialized because they are not pretrained
+    layers2init = ["dense1", "dense1_bn", "dense_out"]
     # Add the new dense layer for classification
     input_units = conv_out.output.shape[-1]  # conv_out is a Flatten layer
-    l = eddl.Dense(conv_out, input_units // 4, name="dense1")
-    l = eddl.BatchNormalization(l, True, name="dense1_bn")
+    l = eddl.Dense(conv_out, input_units // 4, name=layers2init[0])
+    l = eddl.BatchNormalization(l, True, name=layers2init[1])
     l = eddl.ReLu(l, name="dense1_relu")
-    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name="dense_out"))
+    out_ = eddl.Softmax(eddl.Dense(l, num_classes, name=layers2init[2]))
 
-    # This layers must be initialized because they are not pretrained
-    layer2init = ["dense1", "dense1_bn", "dense_out"]
-
-    return eddl.Model([in_], [out_]), layer2init
+    return eddl.Model([in_], [out_]), layers2init
