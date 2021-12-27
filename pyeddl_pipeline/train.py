@@ -18,6 +18,9 @@ from lib.plot_utils import plot_training_results
 
 def main(args):
 
+    if args.normal_vs_classification:
+        args.binary_loss = True
+
     ###################
     # Prepare Dataset #
     ###################
@@ -36,9 +39,8 @@ def main(args):
 
     # Data info
     in_shape = (dataset.n_channels_, *args.target_size)
-    num_classes = len(dataset.classes_)
+    args.num_classes = len(dataset.classes_)
     args.in_shape = in_shape
-    args.num_classes = num_classes
     args.classes = dataset.classes_
     # Get the full dataset configuration to log it in the experiment logs
     dataset_config_file = args.yaml_path[:-5] + "_args.json"
@@ -52,6 +54,9 @@ def main(args):
     #################
     # Prepare Model #
     #################
+
+    # We use this variable to select the number of units in the output layer
+    num_classes = 1 if args.normal_vs_classification else args.num_classes
 
     if args.model_ckpt:
         # Load the model from an ONNX file to use it as a checkpoint
@@ -198,7 +203,8 @@ def main(args):
         print(f"  - acc={test_results['acc']:.4f}")
         print("\nTest report:")
         print(f"sklearn accuracy = {test_results['sklearn_acc']}")
-        if not args.multiclass and not args.binary_loss:
+        binary_multilabel = args.binary_loss and not args.normal_vs_classification
+        if not args.multiclass and not binary_multilabel:
             print(f"balanced accuracy = {test_results['balanced_acc']}")
         else:
             print(f"Multilabel confusion matrix (classes: {dataset.classes_}):")
@@ -282,8 +288,16 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--binary-loss",
         help=("Changes the pipeline to use binary cross entropy as loss "
-              "function enabling multiclass classification. The loss and "
-              "metrics are computed for each unit(class) of the output layer"),
+              "function enabling multiclass classification. The loss is "
+              "computed for each unit (class) of the output layer"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--normal-vs-classification", "-normal-vs",
+        help=("Prepares the pipeline for binary classification where one of "
+              "the two classes provided in the dataset must be 'normal'. The "
+              "model will use a single output neuron to perform the binary "
+              "classification using BCE loss and binary accuracy metric"),
         action="store_true")
 
     arg_parser.add_argument(

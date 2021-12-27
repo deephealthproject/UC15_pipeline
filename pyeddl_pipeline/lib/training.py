@@ -21,6 +21,28 @@ import pyeddl.eddl as eddl
 # Utils #
 #########
 
+def is_normal_vs_classification(classes: list) -> bool:
+    """
+    Checks if the classes provides correspond to a binary classification task
+    of 'normal' vs 'other_class'.
+
+    Args:
+        classes: List of class names
+
+    Returns:
+        The index of the 'other_class' string in the list provided. Returns -1
+        if the task is not 'normal' vs 'other_class'
+    """
+    if len(classes) != 2:
+        return -1
+
+    if classes[0] == 'normal':
+        return 1
+    if classes[1] == 'normal':
+        return 0
+
+    return -1
+
 
 def get_losses_and_metrics(args: argparse.Namespace) -> tuple:
     """
@@ -42,7 +64,10 @@ def get_losses_and_metrics(args: argparse.Namespace) -> tuple:
     else:
         losses = ["softmax_cross_entropy"]
 
-    metrics = ['accuracy']
+    if args.normal_vs_classification:
+        metrics = ['binary_accuracy']
+    else:
+        metrics = ['accuracy']
 
     return (losses, metrics)
 
@@ -294,6 +319,12 @@ def train(model: eddl.Model,
             - best_model_byacc: Path to the ONNX file with the best model
                                 selected by val_acc
     """
+    if args.normal_vs_classification:
+        class_idx = is_normal_vs_classification(dataset.classes_)
+        if class_idx == -1:
+            raise Exception("The classes of the dataset are not valid "
+                            "for binary classification (normal vs OTHER)")
+
     n_train_samples = len(dataset.GetSplit(ecvl.SplitType.training))
     n_train_batches = n_train_samples // args.batch_size
     n_val_samples = len(dataset.GetSplit(ecvl.SplitType.validation))
@@ -359,6 +390,9 @@ def train(model: eddl.Model,
             vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
+            if args.normal_vs_classification:
+                # Select the value for the label: {0: normal, 1: other_class}
+                y = y.select([":", f"{class_idx}"])
             # Perform training with batch: forward and backward
             train_start = time.perf_counter()
             eddl.train_batch(model, [x], [y])
@@ -401,6 +435,9 @@ def train(model: eddl.Model,
             vsamples, x, y = dataset.GetBatch()
             load_end = time.perf_counter()
             load_time += load_end - load_start
+            if args.normal_vs_classification:
+                # Select the value for the label: {0: normal, 1: other_class}
+                y = y.select([":", f"{class_idx}"])
             # Perform forward computations
             eval_start = time.perf_counter()
             eddl.eval_batch(model, [x], [y])
@@ -500,6 +537,12 @@ def test(model: eddl.Model,
             - report: Full report with more metrics by class
                       (Check: sklearn.metrics.classification_report)
     """
+    if args.normal_vs_classification:
+        class_idx = is_normal_vs_classification(dataset.classes_)
+        if class_idx == -1:
+            raise Exception("The classes of the dataset are not valid "
+                            "for binary classification (normal vs OTHER)")
+
     n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
     n_test_batches = n_test_samples // args.batch_size
 
@@ -528,6 +571,9 @@ def test(model: eddl.Model,
         vsamples, x, y = dataset.GetBatch()
         load_end = time.perf_counter()
         load_time += load_end - load_start
+        if args.normal_vs_classification:
+            # Select the value for the label: {0: normal, 1: other_class}
+            y = y.select([":", f"{class_idx}"])
         # Perform forward computations
         test_start = time.perf_counter()
         eddl.eval_batch(model, [x], [y])
@@ -559,14 +605,21 @@ def test(model: eddl.Model,
 
     dataset.Stop()  # Join worker threads
 
+    if args.normal_vs_classification:
+        # Ensure that the class 0 is normal
+        classes_names = ['normal', dataset.classes_[class_idx]]
+    else:
+        classes_names = dataset.classes_
+
     # Compute a report with statistics for each target class
     report = classification_report(targets,
                                    preds,
-                                   target_names=dataset.classes_,
+                                   target_names=classes_names,
                                    output_dict=True)
     sklearn_acc = accuracy_score(targets, preds)
 
-    if not args.multiclass and not args.binary_loss:
+    binary_multilabel = args.binary_loss and not args.normal_vs_classification
+    if not args.multiclass and not binary_multilabel:
         balanced_acc = balanced_accuracy_score(targets, preds)
         history["balanced_acc"] = balanced_acc
     else:
