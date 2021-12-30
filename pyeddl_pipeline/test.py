@@ -8,10 +8,13 @@ import json
 import pyecvl.ecvl as ecvl
 import pyeddl.eddl as eddl
 
-from lib.training import get_augmentations, test
+from lib.training import get_augmentations, test, get_losses_and_metrics
 
 
 def main(args):
+
+    if args.normal_vs_classification:
+        args.binary_loss = True
 
     ###################
     # Prepare Dataset #
@@ -35,6 +38,12 @@ def main(args):
         print(f"\nGoing to load the model \"{onnx_path}\" for testing")
         model = eddl.import_net_from_onnx_file(onnx_path)
 
+        losses, metrics = get_losses_and_metrics(args)
+
+        print("Going to build the model:")
+        print(f" - losses: {losses}")
+        print(f" - metrics: {metrics}")
+
         # Get the computing device
         if args.cpu:
             comp_serv = eddl.CS_CPU(-1, args.mem_level)
@@ -43,8 +52,8 @@ def main(args):
 
         eddl.build(model,
                    eddl.adam(0.0001),
-                   ["softmax_cross_entropy"],
-                   ["accuracy"],
+                   losses,
+                   metrics,
                    comp_serv,
                    False)  # Avoid weights initialization
 
@@ -60,7 +69,8 @@ def main(args):
         print(f"  - acc={test_results['acc']:.4f}")
         print("\nTest report:")
         print(f"sklearn accuracy = {test_results['sklearn_acc']}")
-        if not args.multiclass and not args.binary_loss:
+        binary_multilabel = args.binary_loss and not args.normal_vs_classification
+        if not args.multiclass and not binary_multilabel:
             print(f"balanced accuracy = {test_results['balanced_acc']}")
         else:
             print(f"Multilabel confusion matrix (classes: {dataset.classes_}):")
@@ -96,6 +106,14 @@ if __name__ == "__main__":
         help=("Changes the pipeline to use binary cross entropy as loss "
               "function enabling multiclass classification. The loss and "
               "metrics are computed for each unit(class) of the output layer"),
+        action="store_true")
+
+    arg_parser.add_argument(
+        "--normal-vs-classification", "-normal-vs",
+        help=("Prepares the pipeline for binary classification where one of "
+              "the two classes provided in the dataset must be 'normal'. The "
+              "model will use a single output neuron to perform the binary "
+              "classification using BCE loss and binary accuracy metric"),
         action="store_true")
 
     arg_parser.add_argument(
