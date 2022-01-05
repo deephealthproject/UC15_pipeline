@@ -327,8 +327,7 @@ def train(model: eddl.Model,
 
     n_train_samples = len(dataset.GetSplit(ecvl.SplitType.training))
     n_train_batches = n_train_samples // args.batch_size
-    n_val_samples = len(dataset.GetSplit(ecvl.SplitType.validation))
-    n_val_batches = n_val_samples // args.batch_size
+    n_val_batches = dataset.GetNumBatches(ecvl.SplitType.validation)
 
     # To store and return the training results
     metrics_names = ["loss", "acc", "val_loss", "val_acc"]
@@ -405,7 +404,7 @@ def train(model: eddl.Model,
             pbar.set_description(
                 f"Training[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
-                              "batches_queue": f"{dataset.GetQueueSize()}",
+                              "data_queue": f"{dataset.GetQueueSize()}",
                               "avg_train_time": f"{train_time / batch:.3f}s"})
 
         # Save the epoch results of the train split
@@ -438,6 +437,7 @@ def train(model: eddl.Model,
             if args.normal_vs_classification:
                 # Select the value for the label: {0: normal, 1: other_class}
                 y = y.select([":", f"{class_idx}"])
+            model.resize(x.shape[0])
             # Perform forward computations
             eval_start = time.perf_counter()
             eddl.eval_batch(model, [x], [y])
@@ -450,7 +450,7 @@ def train(model: eddl.Model,
             pbar.set_description(
                 f"Validation[val_loss={losses[0]:.4f}, val_acc={metrics[0]:.4f}]")
             pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
-                              "batches_queue": f"{dataset.GetQueueSize()}",
+                              "data_queue": f"{dataset.GetQueueSize()}",
                               "avg_eval_time": f"{eval_time / batch:.3f}s"})
 
         # Save the epoch results of the validation split
@@ -543,8 +543,7 @@ def test(model: eddl.Model,
             raise Exception("The classes of the dataset are not valid "
                             "for binary classification (normal vs OTHER)")
 
-    n_test_samples = len(dataset.GetSplit(ecvl.SplitType.test))
-    n_test_batches = n_test_samples // args.batch_size
+    n_test_batches = dataset.GetNumBatches(ecvl.SplitType.test)
 
     # To store and return the testing results
     metrics_names = ["loss", "acc"]
@@ -574,6 +573,7 @@ def test(model: eddl.Model,
         if args.normal_vs_classification:
             # Select the value for the label: {0: normal, 1: other_class}
             y = y.select([":", f"{class_idx}"])
+        model.resize(x.shape[0])
         # Perform forward computations
         test_start = time.perf_counter()
         eddl.eval_batch(model, [x], [y])
@@ -600,7 +600,7 @@ def test(model: eddl.Model,
         pbar.set_description(
             f"Test[loss={losses[0]:.4f}, acc={metrics[0]:.4f}]")
         pbar.set_postfix({"avg_load_time": f"{load_time / batch:.3f}s",
-                          "batches_queue": f"{dataset.GetQueueSize()}",
+                          "data_queue": f"{dataset.GetQueueSize()}",
                           "avg_test_time": f"{test_time / batch:.3f}s"})
 
     dataset.Stop()  # Join worker threads

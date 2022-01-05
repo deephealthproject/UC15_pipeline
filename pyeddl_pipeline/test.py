@@ -28,7 +28,9 @@ def main(args):
     dataset = ecvl.DLDataset(args.yaml_path,
                              args.batch_size,
                              splits_augs,
-                             color_type)
+                             color_type,
+                             num_workers=args.datagen_workers,
+                             queue_ratio_size=args.queue_ratio_size)
 
     ###################
     # Perform testing #
@@ -174,6 +176,19 @@ if __name__ == "__main__":
         "--seed",
         help="Seed value for random operations",
         default=1234,
+        type=int)
+
+    arg_parser.add_argument(
+        "--datagen-workers",
+        help="Number of worker threads to use for loading the batches",
+        default=1,
+        type=int)
+
+    arg_parser.add_argument(
+        "--queue-ratio-size",
+        help=("The producers-consumer queue of the data generator will have a "
+              "maximum size equal to batch_size x queue_ratio_size x datagen_workers"),
+        default=1,
         type=int)
 
     main(arg_parser.parse_args())
