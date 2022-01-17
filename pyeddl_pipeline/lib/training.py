@@ -625,6 +625,12 @@ def test(model: eddl.Model,
     else:
         multilabel_confmat = multilabel_confusion_matrix(targets, preds)
         history["multilabel_confmat"] = str(multilabel_confmat)
+        # Compute the accuracy of each class using the conf. mat.
+        for c, mat in zip(dataset.classes_, multilabel_confmat):
+            TN, FP = mat[0]
+            FN, TP = mat[1]
+            class_acc = (TP + TN) / (TP + TN + FP + FN)
+            report[c]['accuracy'] = class_acc  # We add the value to the report
 
     # Save test results
     history["loss"] = losses[0]
