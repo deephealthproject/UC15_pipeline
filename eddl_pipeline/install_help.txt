@@ -2,12 +2,23 @@
 # 1 - Install EDDL #
 ####################
 
-# Install EDDL with CONDA
-# 1.1 First create a conda environment and activate it
-# 1.2 Install EDDL
-conda install -c deephealth eddl-cudnn
-# WARNING: Not tested with the next installation steps. The ECVL install flag "-Deddl_DIR" can be different
-# The next installation steps have been tested with the EDDL installation from sources
+# 1.1 - Download the source code
+git clone https://github.com/deephealthproject/eddl.git
+pushd eddl > /dev/null
+
+# 1.2 Prepare conda environment to compile EDDL
+conda env create -f environment.yml
+conda activate eddl
+
+# 1.3 - Configure build
+mkdir build
+pushd build > /dev/null
+cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX ..
+make -j$(nproc)  # Use all available cores
+make install
+
+popd > /dev/null  # Exit from build
+popd > /dev/null  # Exit from eddl
 
 ###########################################
 # 2 - Install OpenCV (dependency of ECVL) #
@@ -21,9 +32,8 @@ pushd opencv > /dev/null
 
 # 2.2 - Configure build
 mkdir build
-cd build
-# use option -DBUILD_TIFF=ON for cmake if LIBTIFF_4.0 link errors appear
-cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX ..  # Set install path to conda environment
+pushd build > /dev/null
+cmake -DBUILD_TIFF=ON -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX ..
 
 # 2.3 - Compile and install
 make -j$(nproc)  # Use all available cores
