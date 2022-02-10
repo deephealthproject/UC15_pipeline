@@ -24,6 +24,8 @@ struct Arguments {
   std::string augmentations;     // DA version tag to use
   std::string model;             // Name of the topology to use
   std::string ckpt;              // ONNX file to use as checkpoint to start training
+  std::string regularization;    // Adds the selected regularization type to all the layers of the model
+  float regularization_factor;   // Factor for the selected regularization type
   std::string optimizer;         // Name of the training optimizer to use
   float learning_rate;           // Learning rate of the optimizer
   float lr_decay;                // Decay factor for the learning rate
@@ -51,6 +53,8 @@ struct Arguments {
             const std::string augmentations,
             const std::string model,
             const std::string ckpt,
+            const std::string regularization,
+            const float regularization_factor,
             const std::string optimizer,
             const float learning_rate,
             const float lr_decay,
@@ -71,6 +75,8 @@ struct Arguments {
         augmentations(augmentations),
         model(model),
         ckpt(ckpt),
+        regularization(regularization),
+        regularization_factor(regularization_factor),
         optimizer(optimizer),
         learning_rate(learning_rate),
         lr_decay(lr_decay),

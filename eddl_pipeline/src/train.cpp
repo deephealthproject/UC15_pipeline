@@ -62,6 +62,11 @@ int main(int argc, char **argv) {
     std::cout << "Model loaded!\n";
   }
 
+  if (!args.regularization.empty()) {
+    std::cout << "Going to apply " << args.regularization << " regularization to the model\n";
+    apply_regularization(model, args.regularization, args.regularization_factor);
+  }
+
   Optimizer *opt = get_optimizer(args.optimizer, args.learning_rate);
 
   CompServ *cs = get_computing_service(args);

@@ -44,6 +44,18 @@ void dataset_summary(ecvl::DLDataset &dataset, const Arguments &args) {
   std::cout << " - n_batches = " << n_te_batches << "\n";
 }
 
+void apply_regularization(Net *model, const std::string &regularization, const float factor) {
+  if (regularization == "l1")
+    for (eddl::layer l : model->layers)
+      eddl::L1(l, factor);
+  else if (regularization == "l2")
+    for (eddl::layer l : model->layers)
+      eddl::L2(l, factor);
+  else if (regularization == "l1l2")
+    for (eddl::layer l : model->layers)
+      eddl::L1L2(l, factor, factor);
+}
+
 TrainResults train(ecvl::DLDataset &dataset, Net *model,
                    const std::string &exp_name, Arguments &args) {
   // Prepare the train data generator

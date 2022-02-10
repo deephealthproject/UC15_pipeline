@@ -41,6 +41,8 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_str_attr("augmentations", args.augmentations); out << ",\n";
   print_str_attr("model", args.model); out << ",\n";
   print_str_attr("ckpt", args.ckpt); out << ",\n";
+  print_str_attr("regularization", args.regularization); out << ",\n";
+  print_num_attr("regularization_factor", args.regularization_factor); out << ",\n";
   print_str_attr("optimizer", args.optimizer); out << ",\n";
   print_num_attr("learning_rate", args.learning_rate); out << ",\n";
   print_num_attr("lr_decay", args.lr_decay); out << ",\n";
@@ -71,6 +73,8 @@ Arguments parse_arguments(int argc, char **argv) {
     ("a,augmentations", "Version of data augmentations to use", cxxopts::value<std::string>()->default_value("0.0"))
     ("m,model", "Name of the model to train", cxxopts::value<std::string>()->default_value("model_1"))
     ("ckpt", "Path to an ONNX file to use as starting point for training", cxxopts::value<std::string>()->default_value(""))
+    ("regularization", "Adds the selected regularization type to all the layers of the model", cxxopts::value<std::string>()->default_value(""))
+    ("regularization_factor", "Factor for the selected regularization type", cxxopts::value<float>()->default_value("0.0001"))
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
     ("l,learning_rate", "Value of the learning rate", cxxopts::value<float>()->default_value("0.0001"))
     ("lr_decay", "Decay factor for the learning rate", cxxopts::value<float>()->default_value("0.0"))
@@ -102,6 +106,8 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["augmentations"].as<std::string>(),
                    result["model"].as<std::string>(),
                    result["ckpt"].as<std::string>(),
+                   result["regularization"].as<std::string>(),
+                   result["regularization_factor"].as<float>(),
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
                    result["lr_decay"].as<float>(),

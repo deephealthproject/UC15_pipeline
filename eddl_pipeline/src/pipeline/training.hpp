@@ -33,6 +33,8 @@ struct TrainResults {
 
 void dataset_summary(ecvl::DLDataset &dataset, const Arguments &args);
 
+void apply_regularization(Net *model, const std::string &regularization, const float factor);
+
 TrainResults train(ecvl::DLDataset &dataset, Net *model,
                    const std::string &exp_name, Arguments &args);
 
