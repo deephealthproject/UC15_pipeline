@@ -317,18 +317,99 @@ Net *model_3b(const std::vector<int> in_shape, const int num_classes, const std:
     return eddl::Model({in_}, {out_});
 }
 
+std::tuple<Net *, bool, std::vector<std::string>>
+resnet(const std::vector<int> in_shape,
+       const int num_classes,
+       const int version,
+       const std::string &classifier_output,
+       const bool pretrained) {
+  eddl::model pretrained_model;
+  switch (version) {
+      case 18:
+        pretrained_model = eddl::download_resnet18(true, in_shape);
+        break;
+      case 34:
+        pretrained_model = eddl::download_resnet34(true, in_shape);
+        break;
+      case 50:
+        pretrained_model = eddl::download_resnet50(true, in_shape);
+        break;
+      case 101:
+        pretrained_model = eddl::download_resnet101(true, in_shape);
+        break;
+      case 152:
+        pretrained_model = eddl::download_resnet152(true, in_shape);
+        break;
+      default:
+        std::cerr << "[ERROR] ResNet version " << version << " is not valid!\n";
+        break;
+  }
 
-Net *get_model(const std::string &model_name,
-               const std::vector<int> &in_shape,
-               const int num_classes,
-               const std::string & classifier_output) {
+  // Get the input layer of the pretrained model
+  eddl::layer in_ = eddl::getLayer(pretrained_model, "input");
+  // Get the last layer of the pretrained model
+  eddl::layer top_layer = eddl::getLayer(pretrained_model, "top");
 
-  if (model_name == "model_1")  return model_1( in_shape, num_classes, classifier_output);
-  if (model_name == "model_2a") return model_2a(in_shape, num_classes, classifier_output);
-  if (model_name == "model_2b") return model_2b(in_shape, num_classes, classifier_output);
-  if (model_name == "model_2c") return model_2c(in_shape, num_classes, classifier_output);
-  if (model_name == "model_3a") return model_3a(in_shape, num_classes, classifier_output);
-  if (model_name == "model_3b") return model_3b(in_shape, num_classes, classifier_output);
+  // Create the new densely connected part
+  std::vector<std::string> layers2init{"dense1", "dense_out"};
+  const int input_units = top_layer->output->shape[1];
+  eddl::layer l = eddl::Dense(top_layer, input_units / 2, true, layers2init[0]);
+  l = eddl::ReLu(l);
+  l = eddl::Dropout(l, 0.4);
+  // Output layer
+  eddl::layer out_ = nullptr;
+  if (classifier_output == "sigmoid")
+    out_ = eddl::Sigmoid(eddl::Dense(l, num_classes == 2 ? 1 : num_classes,
+                                     true, layers2init[1]));
+  else
+    out_ = eddl::Softmax(eddl::Dense(l, num_classes, true, layers2init[1]));
+
+  return {eddl::Model({in_}, {out_}), !pretrained, layers2init};
+}
+
+std::tuple<Net *, bool, std::vector<std::string>>
+get_model(const std::string &model_name,
+          const std::vector<int> &in_shape,
+          const int num_classes,
+          const std::string & classifier_output) {
+
+  // Models from scratch
+  if (model_name == "model_1")
+    return {model_1( in_shape, num_classes, classifier_output), true, {}};
+  if (model_name == "model_2a")
+    return {model_2a(in_shape, num_classes, classifier_output), true, {}};
+  if (model_name == "model_2b")
+    return {model_2b(in_shape, num_classes, classifier_output), true, {}};
+  if (model_name == "model_2c")
+    return {model_2c(in_shape, num_classes, classifier_output), true, {}};
+  if (model_name == "model_3a")
+    return {model_3a(in_shape, num_classes, classifier_output), true, {}};
+  if (model_name == "model_3b")
+    return {model_3b(in_shape, num_classes, classifier_output), true, {}};
+
+  // ResNet models (not pretrained)
+  if (model_name == "ResNet18")
+    return resnet(in_shape, num_classes, 18, classifier_output, false);
+  if (model_name == "ResNet34")
+    return resnet(in_shape, num_classes, 34, classifier_output, false);
+  if (model_name == "ResNet50")
+    return resnet(in_shape, num_classes, 50, classifier_output, false);
+  if (model_name == "ResNet101")
+    return resnet(in_shape, num_classes, 101, classifier_output, false);
+  if (model_name == "ResNet152")
+    return resnet(in_shape, num_classes, 152, classifier_output, false);
+
+  // ResNet models (pretrained with Imagenet)
+  if (model_name == "Pretrained_ResNet18")
+    return resnet(in_shape, num_classes, 18, classifier_output, true);
+  if (model_name == "Pretrained_ResNet34")
+    return resnet(in_shape, num_classes, 34, classifier_output, true);
+  if (model_name == "Pretrained_ResNet50")
+    return resnet(in_shape, num_classes, 50, classifier_output, true);
+  if (model_name == "Pretrained_ResNet101")
+    return resnet(in_shape, num_classes, 101, classifier_output, true);
+  if (model_name == "Pretrained_ResNet152")
+    return resnet(in_shape, num_classes, 152, classifier_output, true);
 
   std::cout << "The model name provided (\"" << model_name
             << "\") is not valid!\n";

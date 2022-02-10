@@ -30,15 +30,10 @@ int main(int argc, char **argv) {
 
   // Prepare data augmentations for each split
   ecvl::DatasetAugmentations data_augmentations{get_augmentations(args)};
-  auto color_type = ecvl::ColorType::GRAY;
-  if (args.rgb_or_gray == "RGB") {
-    color_type = ecvl::ColorType::RGB;
-  } else if (args.rgb_or_gray == "gray" || args.rgb_or_gray == "grey") {
-    color_type = ecvl::ColorType::GRAY;
-  } else
-    std::cerr << "\nERROR: non-recognized color/monochrome specification \"" << args.rgb_or_gray << "\"\n\n";
+  ecvl::ColorType color_type = get_color_type(args.rgb_or_gray);
 
-  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations, color_type);
+  ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations,
+                          color_type, ecvl::ColorType::GRAY, args.workers);
   std::cout << "\nCreated ECVL DL Dataset from \"" << args.yaml_path << "\"\n\n";
   // Show basic dataset info
   dataset_summary(dataset, args);
@@ -53,7 +48,11 @@ int main(int argc, char **argv) {
     // Create the model topology selected
     std::cout << "Going to prepare the model \"" << args.model << "\"\n";
     auto in_shape = {dataset.n_channels_, args.target_shape[0], args.target_shape[1]};
-    model = get_model(args.model, in_shape, dataset.classes_.size(), args.classifier_output);
+    auto [net, init_w, l2init] = get_model(args.model, in_shape, dataset.classes_.size(),
+                                           args.classifier_output);
+    model = net;
+    init_weights = init_w;
+    args.layers2init = l2init;
     std::cout << "Model created!\n";
   } else {
     // Load the ONNX model as checkpoint
@@ -65,17 +64,13 @@ int main(int argc, char **argv) {
 
   Optimizer *opt = get_optimizer(args.optimizer, args.learning_rate);
 
-  CompServ *cs;
-  if (args.cpu)
-    cs = eddl::CS_CPU(-1, "full_mem");
-  else
-    cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
+  CompServ *cs = get_computing_service(args);
 
   if (args.classifier_output == "softmax") {
     eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, init_weights);
   } else if (args.classifier_output == "sigmoid") {
     if (dataset.classes_.size() == 2) {
-        eddl::build(model, opt, {"binary_cross_entropy"}, {"binary_accuracy"}, cs, init_weights);
+      eddl::build(model, opt, {"binary_cross_entropy"}, {"binary_accuracy"}, cs, init_weights);
     } else {
       eddl::build(model, opt, {"mse"}, {"categorical_accuracy"}, cs, init_weights);
       //eddl::build(model, opt, {"cross_entropy"}, {"categorical_accuracy"}, cs, init_weights);
@@ -85,6 +80,25 @@ int main(int argc, char **argv) {
     std::abort();
   }
   std::cout << "Model built!\n\n";
+
+  // Check if we have to prepare a pretrained model
+  if (!init_weights && args.ckpt.empty()) {
+    args.is_pretrained = true;
+    // Freeze the pretrained layers
+    if (args.frozen_epochs > 0) {
+      std::cout << "Going to freeze the pretrained weights\n";
+      for (eddl::layer l : model->layers) {
+        if (std::find(args.layers2init.begin(), args.layers2init.end(), l->name) == args.layers2init.end())
+          eddl::setTrainable(model, l->name, false);
+          args.pretrained_layers.push_back(l->name);
+      }
+    }
+
+    // Initialize the new layers
+    for (const std::string& lname : args.layers2init)
+      eddl::initializeLayer(model, lname);
+  }
+
   eddl::summary(model);
 
   std::cout << "###############\n";
@@ -107,10 +121,7 @@ int main(int argc, char **argv) {
 
     // Build the model
     opt = get_optimizer(args.optimizer, args.learning_rate);
-    if (args.cpu)
-      cs = eddl::CS_CPU(-1, "full_mem");
-    else
-      cs = eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
+    cs = get_computing_service(args);
 
     if (args.classifier_output == "softmax") {
       eddl::build(model, opt, {"softmax_cross_entropy"}, {"accuracy"}, cs, false);
@@ -125,6 +136,11 @@ int main(int argc, char **argv) {
       std::cerr << "ERROR: unexpected classifier output: " << args.classifier_output << std::endl;
       std::abort();
     }
+
+    // We create the dataset again to avoid an issue that stops the testing process
+    // This issue affects the testing phase of the second model tested (by acc)
+    ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations,
+                            color_type, ecvl::ColorType::GRAY, args.workers);
 
     TestResults te_res = test(dataset, model, args);
 

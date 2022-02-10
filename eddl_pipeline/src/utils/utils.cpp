@@ -31,8 +31,8 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_vec_attr("target_shape", args.target_shape); out << ",\n";
   print_str_attr("rgb_or_gray", args.rgb_or_gray); out << ",\n";
   print_num_attr("epochs", args.epochs); out << ",\n";
+  print_num_attr("frozen_epochs", args.frozen_epochs); out << ",\n";
   print_num_attr("batch_size", args.batch_size); out << ",\n";
-  print_num_attr("use_dldataset", args.use_dldataset); out << ",\n";
   print_num_attr("workers", args.workers); out << ",\n";
   print_vec_attr("gpus", args.gpus); out << ",\n";
   print_num_attr("lsb", args.lsb); out << ",\n";
@@ -43,6 +43,7 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_str_attr("ckpt", args.ckpt); out << ",\n";
   print_str_attr("optimizer", args.optimizer); out << ",\n";
   print_num_attr("learning_rate", args.learning_rate); out << ",\n";
+  print_num_attr("lr_decay", args.lr_decay); out << ",\n";
   print_num_attr("seed", args.seed); out << ",\n";
   print_str_attr("exp_path", args.exp_path); out << ",\n"; 
   print_str_attr("classifier_output", args.classifier_output); out << "\n"; // Dont put "," in the last attr
@@ -60,8 +61,8 @@ Arguments parse_arguments(int argc, char **argv) {
     ("t,target_shape", "Height and Width to resize the images", cxxopts::value<std::vector<int>>()->default_value("256,256"))
     ("rgb_or_gray", "Whether to use RGB or Gray images", cxxopts::value<std::string>()->default_value("gray"))
     ("e,epochs", "Number of training epochs", cxxopts::value<int>()->default_value("10"))
+    ("frozen_epochs", "Number of epochs before unfreezing the pretrained weights", cxxopts::value<int>()->default_value("5"))
     ("b,batch_size", "Number of samples per minibatch", cxxopts::value<int>()->default_value("32"))
-    ("u,use_dldataset", "Use DLDataset to load the batches instead of the multithreaded DataGenerator", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
     ("w,workers", "Number of workers threads to load batches in the DataGenerator", cxxopts::value<int>()->default_value("1"))
     ("g,gpus", "GPUs to use. Selected with a bit mask: \"1,1\" for two gpus", cxxopts::value<std::vector<int>>()->default_value("1"))
     ("lsb", "Number of batches to process between GPUs synchronizations", cxxopts::value<int>()->default_value("1"))
@@ -72,6 +73,7 @@ Arguments parse_arguments(int argc, char **argv) {
     ("ckpt", "Path to an ONNX file to use as starting point for training", cxxopts::value<std::string>()->default_value(""))
     ("o,optimizer", "Name of the training optimizer", cxxopts::value<std::string>()->default_value("Adam"))
     ("l,learning_rate", "Value of the learning rate", cxxopts::value<float>()->default_value("0.0001"))
+    ("lr_decay", "Decay factor for the learning rate", cxxopts::value<float>()->default_value("0.0"))
     ("s,seed", "Seed value for random computations", cxxopts::value<int>()->default_value("27"))
     ("exp_path", "Path to the folder to store the experiments", cxxopts::value<std::string>()->default_value("experiments"))
     ("classifier_output", "Whether to use softmax or sigmoid as the activation function of the output layer", cxxopts::value<std::string>()->default_value("softmax"))
@@ -90,8 +92,8 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["target_shape"].as<std::vector<int>>(),
                    result["rgb_or_gray"].as<std::string>(),
                    result["epochs"].as<int>(),
+                   result["frozen_epochs"].as<int>(),
                    result["batch_size"].as<int>(),
-                   result["use_dldataset"].as<bool>(),
                    result["workers"].as<int>(),
                    result["gpus"].as<std::vector<int>>(),
                    result["lsb"].as<int>(),
@@ -102,6 +104,7 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["ckpt"].as<std::string>(),
                    result["optimizer"].as<std::string>(),
                    result["learning_rate"].as<float>(),
+                   result["lr_decay"].as<float>(),
                    result["seed"].as<int>(),
                    result["exp_path"].as<std::string>(),
                    result["classifier_output"].as<std::string>());
@@ -116,4 +119,23 @@ std::string get_current_time_str(const std::string time_format) {
   std::ostringstream oss;
   oss << std::put_time(&tm, time_format.c_str());
   return oss.str();
+}
+
+ecvl::ColorType get_color_type(const std::string rgb_or_gray) {
+  if (rgb_or_gray == "RGB") {
+    return ecvl::ColorType::RGB;
+  } else if (rgb_or_gray == "gray" || rgb_or_gray == "grey") {
+    return ecvl::ColorType::GRAY;
+  } else {
+    std::cerr << "\nERROR: non-recognized color/monochrome specification \""
+              << rgb_or_gray << "\"\n\n";
+    return ecvl::ColorType::GRAY;
+  }
+}
+
+CompServ *get_computing_service(const Arguments args) {
+  if (args.cpu)
+    return eddl::CS_CPU(-1, "full_mem");
+  else
+    return eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
 }

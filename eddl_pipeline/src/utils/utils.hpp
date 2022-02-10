@@ -6,13 +6,16 @@
 #include <string>
 #include <vector>
 
+#include <eddl/apis/eddl.h>
+#include <ecvl/support_eddl.h>
+
 struct Arguments {
   std::string yaml_path;         // Path to the yaml that defines the ECVL Dataset
   std::vector<int> target_shape; // Height and Width to resize the input
   std::string rgb_or_gray;       // Whether to use RGB or Gray images
   int epochs;                    // Max number of training epochs
+  int frozen_epochs;             // Number of epochs before unfreezing the pretrained weights
   int batch_size;                // Size of the batches to load (for training and test)
-  bool use_dldataset;            // Use DLDataset to load the batches (not DataGenerator)
   int workers;                   // Number of workers threads in the DataGenerator
   std::vector<int> gpus;         // Bit mask to select the GPUs to use
   int lsb;                       // Number of batches between GPUs synchronization
@@ -23,17 +26,23 @@ struct Arguments {
   std::string ckpt;              // ONNX file to use as checkpoint to start training
   std::string optimizer;         // Name of the training optimizer to use
   float learning_rate;           // Learning rate of the optimizer
+  float lr_decay;                // Decay factor for the learning rate
   int seed;                      // Seed for the random computations
   std::string exp_path;          // Folder to store the experiments logs
   std::string classifier_output; // Activation type at output: softmax or sigmoid 
+
+  // The following attributes are assigned by the script (not the user)
+  bool is_pretrained = false; // true is using a "Pretrained_" model
+  std::vector<std::string> layers2init; // Name of the new layers added to the "Pretrained_" model
+  std::vector<std::string> pretrained_layers; // Name of the original layers of the "Pretrained_" model
 
   Arguments() = delete;
   Arguments(std::string yaml_path,
             const std::vector<int> &target_shape,
             const std::string rgb_or_gray,
             const int epochs,
+            const int frozen_epochs,
             const int batch_size,
-            const bool use_dldataset,
             const int workers,
             const std::vector<int> &gpus,
             const int lsb,
@@ -44,6 +53,7 @@ struct Arguments {
             const std::string ckpt,
             const std::string optimizer,
             const float learning_rate,
+            const float lr_decay,
             const int seed,
             const std::string exp_path,
             const std::string classifier_output)
@@ -51,8 +61,8 @@ struct Arguments {
         target_shape(target_shape),
         rgb_or_gray(rgb_or_gray),
         epochs(epochs),
+        frozen_epochs(frozen_epochs),
         batch_size(batch_size),
-        use_dldataset(use_dldataset),
         workers(workers),
         gpus(gpus),
         lsb(lsb),
@@ -63,6 +73,7 @@ struct Arguments {
         ckpt(ckpt),
         optimizer(optimizer),
         learning_rate(learning_rate),
+        lr_decay(lr_decay),
         seed(seed),
         exp_path(exp_path),
         classifier_output(classifier_output)
@@ -76,5 +87,9 @@ std::ostream &operator<<(std::ostream &out, Arguments args);
 Arguments parse_arguments(int argc, char **argv);
 
 std::string get_current_time_str(const std::string time_format = "%d-%b_%H:%M");
+
+ecvl::ColorType get_color_type(const std::string rgb_or_gray);
+
+CompServ *get_computing_service(const Arguments args);
 
 #endif
