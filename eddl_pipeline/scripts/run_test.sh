@@ -9,8 +9,8 @@ scripts/train.sh --yaml_path ${yaml_filename} \
                  --model Pretrained_ResNet101 \
                  --classifier_output sigmoid \
                  --augmentations 1.1 \
-                 --epochs 5 \
-                 --frozen_epochs 3 \
+                 --epochs 10 \
+                 --frozen_epochs 5 \
                  --batch_size 8 \
                  --optimizer Adam \
                  --learning_rate 1.0e-5 \
@@ -18,4 +18,4 @@ scripts/train.sh --yaml_path ${yaml_filename} \
                  --regularization l2 \
                  --regularization_factor 0.00001 \
                  --target_shape 256,256 \
-                 --workers 10
+                 --workers 6
