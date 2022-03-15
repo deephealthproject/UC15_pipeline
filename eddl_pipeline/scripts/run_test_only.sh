@@ -23,4 +23,4 @@ time scripts/train.sh --yaml_path ${yaml_filename} \
                  --regularization l2 \
                  --regularization_factor 0.00001 \
                  --target_shape 256,256 \
-                 --workers 6 > $OUTPUT
+                 --workers 6 

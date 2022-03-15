@@ -15,6 +15,6 @@ echo ""
 echo "#########################"
 echo "## Compiling (make -j) ##"
 echo "#########################"
-make -j
+make VERBOSE=1 -j
 
 popd > /dev/null # Go back to the root directory
