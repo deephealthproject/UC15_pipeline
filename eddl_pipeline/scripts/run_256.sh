@@ -14,7 +14,7 @@
 #SBATCH --time=10:00:00
 #
 # Name Nombre del trabajo
-#SBATCH -J "EDDL"
+#SBATCH -J "UC15-256"
 #
 # Partition cola donde se ejecutará. No utilizado
 ##SBATCH --partition=mpi
@@ -24,9 +24,10 @@
 
 N=$1
 BS=$2
+MPIAVG=1
 
-#WIDTH=256
-WIDTH=512
+WIDTH=256
+#WIDTH=512
 HEIGHT=$WIDTH
 TARGET_SHAPE="$WIDTH","$HEIGHT"
 SIZE="$WIDTH"x"$HEIGHT"
@@ -37,7 +38,10 @@ yaml_filename="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/ecvl_${SIZE}_normal-
 yaml_folder="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/split"
 yaml_file="part.yaml"
 
-OUTPUT="distr_n${N}_${SIZE}_bs${BS}.out"
+NAME="distr_n${N}_${SIZE}_bs${BS}"
+OUTPUT=${NAME}.out
+ERR=${NAME}.err
+
 
 MPI_PARAM="-np $N -map-by node:PE=28 --report-bindings"
 
@@ -60,5 +64,6 @@ time mpirun $MPI_PARAM  scripts/distr_train.sh \
                  --regularization l2 \
                  --regularization_factor 0.00001 \
                  --target_shape ${TARGET_SHAPE} \
-                 --workers 6 > $OUTPUT
+                 --mpi_average $MPIAVG \
+                 --workers 6 > $OUTPUT 2> $ERR
 

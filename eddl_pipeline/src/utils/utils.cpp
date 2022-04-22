@@ -27,6 +27,8 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   };
   // Print the Arguments info in json format
   out << "{\n";
+  print_str_attr("yaml_folder", args.yaml_folder); out << ",\n";
+  print_str_attr("yaml_name", args.yaml_name); out << ",\n";
   print_str_attr("yaml_path", args.yaml_path); out << ",\n";
   print_vec_attr("target_shape", args.target_shape); out << ",\n";
   print_str_attr("rgb_or_gray", args.rgb_or_gray); out << ",\n";
@@ -47,7 +49,8 @@ std::ostream& operator<<(std::ostream &out, Arguments args) {
   print_num_attr("learning_rate", args.learning_rate); out << ",\n";
   print_num_attr("lr_decay", args.lr_decay); out << ",\n";
   print_num_attr("seed", args.seed); out << ",\n";
-  print_str_attr("exp_path", args.exp_path); out << ",\n"; 
+  print_str_attr("exp_path", args.exp_path); out << ",\n";
+  print_num_attr("mpi_average", args.mpi_average); out << ",\n"; 
   print_str_attr("classifier_output", args.classifier_output); out << "\n"; // Dont put "," in the last attr
   out << "}";
   return out;
@@ -59,6 +62,8 @@ Arguments parse_arguments(int argc, char **argv) {
   options.set_width(160);
   // Declare the program arguments
   options.add_options()
+    ("yaml_folder", "[DISTR] Path to the ECVL Dataset YAML folder", cxxopts::value<std::string>()->default_value(""))
+    ("yaml_name", "[DISTR] Name of the ECVL Dataset YAML file", cxxopts::value<std::string>()->default_value("part.yml"))
     ("y,yaml_path", "Path to the ECVL Dataset YAML file", cxxopts::value<std::string>()->default_value("../../../datasets/BIMCV-COVID19-cIter_1_2/covid19_posi/ecvl_bimcv_covid19.yaml"))
     ("t,target_shape", "Height and Width to resize the images", cxxopts::value<std::vector<int>>()->default_value("256,256"))
     ("rgb_or_gray", "Whether to use RGB or Gray images", cxxopts::value<std::string>()->default_value("gray"))
@@ -80,6 +85,7 @@ Arguments parse_arguments(int argc, char **argv) {
     ("lr_decay", "Decay factor for the learning rate", cxxopts::value<float>()->default_value("0.0"))
     ("s,seed", "Seed value for random computations", cxxopts::value<int>()->default_value("27"))
     ("exp_path", "Path to the folder to store the experiments", cxxopts::value<std::string>()->default_value("experiments"))
+    ("mpi_average", "Initial nr of batches between avg_weights", cxxopts::value<int>()->default_value("1"))
     ("classifier_output", "Whether to use softmax or sigmoid as the activation function of the output layer", cxxopts::value<std::string>()->default_value("softmax"))
     ("h,help", "Print usage");
 
@@ -92,7 +98,9 @@ Arguments parse_arguments(int argc, char **argv) {
     exit(0);
   }
 
-  return Arguments(result["yaml_path"].as<std::string>(),
+  return Arguments(result["yaml_folder"].as<std::string>(),
+                   result["yaml_name"].as<std::string>(),
+                   result["yaml_path"].as<std::string>(),
                    result["target_shape"].as<std::vector<int>>(),
                    result["rgb_or_gray"].as<std::string>(),
                    result["epochs"].as<int>(),
@@ -113,6 +121,7 @@ Arguments parse_arguments(int argc, char **argv) {
                    result["lr_decay"].as<float>(),
                    result["seed"].as<int>(),
                    result["exp_path"].as<std::string>(),
+                   result["mpi_average"].as<int>(),
                    result["classifier_output"].as<std::string>());
 }
 

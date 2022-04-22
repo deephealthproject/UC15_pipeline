@@ -17,4 +17,6 @@ struct TestResults {
 };
 
 TestResults test(ecvl::DLDataset &dataset, Net *model, Arguments &args);
+TestResults test_distr(ecvl::DLDataset &dataset, Net *model, Arguments &args, bool distr_dataset);
+
 #endif

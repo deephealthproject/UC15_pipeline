@@ -1,0 +1,17 @@
+Run pure sequential:
+
+./scripts/run_test.sh BS
+
+output file: sequential_bsBS.out
+
+Run distributed:
+
+NP=1..max nodes
+
+Caution: srun does not work well in altec
+srun -N NP -n NP --exclusive ./scripts/run_test_distr.sh NP BS
+
+sbatch -N NP --exclusive ./scripts/run_test_distr.sh NP BS
+
+output file: distr_nNP_bsBS.out
+

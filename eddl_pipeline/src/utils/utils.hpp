@@ -10,6 +10,8 @@
 #include <ecvl/support_eddl.h>
 
 struct Arguments {
+  std::string yaml_folder;       // Path to the yaml that defines the ECVL Dataset
+  std::string yaml_name;         // Path to the yaml that defines the ECVL Dataset
   std::string yaml_path;         // Path to the yaml that defines the ECVL Dataset
   std::vector<int> target_shape; // Height and Width to resize the input
   std::string rgb_or_gray;       // Whether to use RGB or Gray images
@@ -30,6 +32,7 @@ struct Arguments {
   float learning_rate;           // Learning rate of the optimizer
   float lr_decay;                // Decay factor for the learning rate
   int seed;                      // Seed for the random computations
+  int mpi_average;               // Initial nr of batches between avg_weights
   std::string exp_path;          // Folder to store the experiments logs
   std::string classifier_output; // Activation type at output: softmax or sigmoid 
 
@@ -39,7 +42,9 @@ struct Arguments {
   std::vector<std::string> pretrained_layers; // Name of the original layers of the "Pretrained_" model
 
   Arguments() = delete;
-  Arguments(std::string yaml_path,
+  Arguments(std::string yaml_folder,
+            std::string yaml_name,
+            std::string yaml_path,
             const std::vector<int> &target_shape,
             const std::string rgb_or_gray,
             const int epochs,
@@ -60,8 +65,11 @@ struct Arguments {
             const float lr_decay,
             const int seed,
             const std::string exp_path,
+            const int mpi_average,
             const std::string classifier_output)
-      : yaml_path(yaml_path),
+      : yaml_folder(yaml_folder),
+        yaml_name(yaml_name),
+        yaml_path(yaml_path),
         target_shape(target_shape),
         rgb_or_gray(rgb_or_gray),
         epochs(epochs),
@@ -82,6 +90,7 @@ struct Arguments {
         lr_decay(lr_decay),
         seed(seed),
         exp_path(exp_path),
+        mpi_average(mpi_average),
         classifier_output(classifier_output)
     {
     }
