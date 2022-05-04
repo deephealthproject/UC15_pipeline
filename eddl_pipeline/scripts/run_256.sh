@@ -14,7 +14,7 @@
 #SBATCH --time=10:00:00
 #
 # Name Nombre del trabajo
-#SBATCH -J "UC15-256"
+#SBATCH -J "UC15-256+"
 #
 # Partition cola donde se ejecutará. No utilizado
 ##SBATCH --partition=mpi
@@ -22,8 +22,17 @@
 #Output fichero de salida (por defecto será slurm-numerodeltrabajo.out). No utilizado
 ##SBATCH --output=resnet50_1_nodo_2_inter.out
 
-N=$1
-BS=$2
+# process arguments
+while  [ $# -ge 2 ]
+do
+	case $1 in 
+		-n) PROCS=$2 ; shift ;;
+		-bs) BS=$2 ; shift ;;
+		*) break ;;
+	esac
+	shift
+done
+
 MPIAVG=1
 
 WIDTH=256
@@ -38,12 +47,12 @@ yaml_filename="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/ecvl_${SIZE}_normal-
 yaml_folder="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/split"
 yaml_file="part.yaml"
 
-NAME="distr_n${N}_${SIZE}_bs${BS}"
+NAME="distr_n${PROCS}_${SIZE}_bs${BS}"
 OUTPUT=${NAME}.out
 ERR=${NAME}.err
 
 
-MPI_PARAM="-np $N -map-by node:PE=28 --report-bindings"
+MPI_PARAM="-np $PROCS -map-by node:PE=28 --report-bindings"
 
 #mpirun $MPI_PARAM -mca pls_rsh_agent "ssh -X -n" xterm -hold -e  scripts/distr_train.sh \
 time mpirun $MPI_PARAM  scripts/distr_train.sh \
