@@ -47,7 +47,7 @@ yaml_filename="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/ecvl_${SIZE}_normal-
 yaml_folder="${HOME}/EDDL_yaml/winter-school/data/${SIZE}/split"
 yaml_file="part.yaml"
 
-NAME="distr_n${PROCS}_${SIZE}_bs${BS}"
+NAME="nccl_n${PROCS}_${SIZE}_bs${BS}"
 OUTPUT=${NAME}.out
 ERR=${NAME}.err
 

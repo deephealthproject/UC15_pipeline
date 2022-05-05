@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 
     //  id= init_distributed2(&argc,&argv,"MPI");
     //set_method_distributed(AUTO_TIME, 1, 1);
-    set_method_distributed(FIXED, 1, 1);
+    set_avg_method_distributed(LIMIT_OVERHEAD, 16);
     n_procs = get_n_procs_distributed();
 
     // DISTR
