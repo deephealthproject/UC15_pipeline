@@ -215,7 +215,7 @@ TrainResults train(ecvl::DLDataset &dataset, Net *model,
         }
         
         // DISTR
-        set_batch_avg_overhead_distributed(train_time-avg_time,avg_time, 0.05, n_tr_batches);
+        set_batch_avg_overhead_distributed(train_time-avg_time,avg_time, n_tr_batches);
         // DISTR
         avg_float_distributed(&curr_loss);
         avg_float_distributed(&curr_acc);
