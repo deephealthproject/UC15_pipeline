@@ -13,7 +13,7 @@ echo "###################"
 CONDA_PREFIX="/usr/local"
 cmake	-DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_PREFIX_PATH=$CONDA_PREFIX \
 	-DCMAKE_CUDA_ARCHITECTURES="all" \
-	-DCMAKE_CUDA_COMPILER="/usr/local/cuda-10.2/bin/nvcc" \
+	-DCMAKE_CUDA_COMPILER="/usr/local/cuda-11.2/bin/nvcc" \
 	$@ ..
 
 echo ""
