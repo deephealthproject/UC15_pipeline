@@ -4,8 +4,17 @@ img_type="RGB"
 #yaml_filename="${HOME}/deephealth/datasets/winter_school/cropped/256x256/ecvl_256x256_normal-vs-covid.yaml"
 yaml_filename="${HOME}/EDDL_yaml/winter-school/data/256x256/ecvl_256x256_normal-vs-covid.yaml"
 
-N=$1
-BS=$2
+# process arguments
+while  [ $# -ge 2 ]
+do
+	case $1 in 
+		-n) PROCS=$2 ; shift ;;
+		-bs) BS=$2 ; shift ;;
+		*) break ;;
+	esac
+	shift
+done
+
 OUTPUT="sequential-$BS.out"
 
 time scripts/train.sh --yaml_path ${yaml_filename} \
