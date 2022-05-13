@@ -157,83 +157,87 @@ int main(int argc, char **argv) {
 
 
     barrier_distributed();
-    std::cout << "##############\n";
-    std::cout << "# Test phase #\n";
-    std::cout << "##############\n";
-    std::vector<std::string> test_models_paths = {tr_res.best_model_by_loss};
-    if (tr_res.best_model_by_loss != tr_res.best_model_by_acc)
-        test_models_paths.push_back(tr_res.best_model_by_acc);
+    
+    // Only process 0 perform the test
+    if (id == 0) {
+        std::cout << "##############\n";
+        std::cout << "# Test phase #\n";
+        std::cout << "##############\n";
+        std::vector<std::string> test_models_paths = {tr_res.best_model_by_loss};
+        if (tr_res.best_model_by_loss != tr_res.best_model_by_acc)
+            test_models_paths.push_back(tr_res.best_model_by_acc);
 
-    // load a given file  
-    //  std::vector<std::string> test_models_paths = {"experiments/10-Mar_11:27_net-Pretrained_ResNet101_DA-1.1_input-256x256_opt-Adam_lr-0.000010/ckpts/10-Mar_11:27_net-Pretrained_ResNet101_DA-1.1_input-256x256_opt-Adam_lr-0.000010_epoch-7_loss-0.275093_acc-0.882143_by-loss-and-acc.onnx"};
+        // load a given file  
+        //  std::vector<std::string> test_models_paths = {"experiments/10-Mar_11:27_net-Pretrained_ResNet101_DA-1.1_input-256x256_opt-Adam_lr-0.000010/ckpts/10-Mar_11:27_net-Pretrained_ResNet101_DA-1.1_input-256x256_opt-Adam_lr-0.000010_epoch-7_loss-0.275093_acc-0.882143_by-loss-and-acc.onnx"};
 
-    for (auto &onnx_path : test_models_paths) {
-        std::cout << "Going to run test with model \"" << onnx_path << "\"\n\n";
-        // Load the model for testing
-        model = import_net_from_onnx_file(onnx_path);
+        for (auto &onnx_path : test_models_paths) {
+            std::cout << "Going to run test with model \"" << onnx_path << "\"\n\n";
+            // Load the model for testing
+            model = import_net_from_onnx_file(onnx_path);
 
-        // Build the model
-        opt = get_optimizer(args.optimizer, args.learning_rate);
-        cs = get_computing_service(args);
+            // Build the model
+            opt = get_optimizer(args.optimizer, args.learning_rate);
+            cs = get_computing_service(args);
 
-        if (args.classifier_output == "softmax") {
-            eddl::build(model, opt,{"softmax_cross_entropy"},
-            {
-                "accuracy"
-            }, cs, false);
-        } else if (args.classifier_output == "sigmoid") {
-            if (dataset.classes_.size() == 2) {
-                eddl::build(model, opt,{"binary_cross_entropy"},
+            if (args.classifier_output == "softmax") {
+                eddl::build(model, opt,{"softmax_cross_entropy"},
                 {
-                    "binary_accuracy"
+                    "accuracy"
                 }, cs, false);
+            } else if (args.classifier_output == "sigmoid") {
+                if (dataset.classes_.size() == 2) {
+                    eddl::build(model, opt,{"binary_cross_entropy"},
+                    {
+                        "binary_accuracy"
+                    }, cs, false);
+                } else {
+                    eddl::build(model, opt,{"mse"},
+                    {
+                        "categorical_accuracy"
+                    }, cs, false);
+                    //eddl::build(model, opt, {"cross_entropy"}, {"categorical_accuracy"}, cs, false);
+                }
             } else {
-                eddl::build(model, opt,{"mse"},
-                {
-                    "categorical_accuracy"
-                }, cs, false);
-                //eddl::build(model, opt, {"cross_entropy"}, {"categorical_accuracy"}, cs, false);
+                std::cerr << "ERROR: unexpected classifier output: " << args.classifier_output << std::endl;
+                std::abort();
             }
-        } else {
-            std::cerr << "ERROR: unexpected classifier output: " << args.classifier_output << std::endl;
-            std::abort();
-        }
 
-        // We create the dataset again to avoid an issue that stops the testing process
-        // This issue affects the testing phase of the second model tested (by acc)
-        //ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations,
-        //        color_type, ecvl::ColorType::GRAY, args.workers);
+            // We create the dataset again to avoid an issue that stops the testing process
+            // This issue affects the testing phase of the second model tested (by acc)
+            //ecvl::DLDataset dataset(args.yaml_path, args.batch_size, data_augmentations,
+            //        color_type, ecvl::ColorType::GRAY, args.workers);
 
 
-        barrier_distributed();
-        if (id == 0)
-            printf("Test results - sequential:\n");
-        TestResults te_res = test(dataset, model, args);
-
-
-        barrier_distributed();
-        if (id == 0)
-            printf("Test results - distributed:\n");
-        te_res = test_distr(dataset, model, args, NO_DISTR_DS);
-
-
-        /*
-                barrier_distributed();
-                printf("Double batch size and repeating ...\n");
-                args.batch_size = args.batch_size * 2;
-                dataset.SetBatchSize(args.batch_size);
-
-                barrier_distributed();
+            //barrier_distributed();
+            if (id == 0)
                 printf("Test results - sequential:\n");
-                te_res = test(dataset, model, args);
-
-                barrier_distributed();
-                printf("Test results - distributed:\n");
-                te_res = test_distr(dataset, model, args, NO_DISTR_DS);
-         */
+            TestResults te_res = test(dataset, model, args);
 
 
-        delete model; // Free memory before the next test iteration
+            //barrier_distributed();
+            //if (id == 0)
+            //    printf("Test results - distributed:\n");
+            //te_res = test_distr(dataset, model, args, NO_DISTR_DS);
+
+
+            /*
+                    barrier_distributed();
+                    printf("Double batch size and repeating ...\n");
+                    args.batch_size = args.batch_size * 2;
+                    dataset.SetBatchSize(args.batch_size);
+
+                    barrier_distributed();
+                    printf("Test results - sequential:\n");
+                    te_res = test(dataset, model, args);
+
+                    barrier_distributed();
+                    printf("Test results - distributed:\n");
+                    te_res = test_distr(dataset, model, args, NO_DISTR_DS);
+             */
+
+
+            delete model; // Free memory before the next test iteration
+        }
     }
 
     // Finalize distributed training
