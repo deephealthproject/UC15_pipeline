@@ -10,6 +10,7 @@ echo "###################"
 echo "## Running CMake ##"
 echo "###################"
 cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_PREFIX_PATH=$CONDA_PREFIX $@ ..
+#cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_PREFIX_PATH=$HOME/local $@ ..
 
 echo ""
 echo "#########################"

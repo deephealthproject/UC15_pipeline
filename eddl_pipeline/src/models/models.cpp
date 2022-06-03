@@ -317,6 +317,150 @@ Net *model_3b(const std::vector<int> in_shape, const int num_classes, const std:
     return eddl::Model({in_}, {out_});
 }
 
+Layer * descending_block_qu_ex(Layer * l_in, int num_filters, float l2_alpha, float dropout_rate)
+{
+    Layer * l = l_in;
+
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Conv2D(l, num_filters, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::MaxPool2D(l, {2, 2}, {2, 2});
+    return l;
+}
+Layer * ascending_block_qu_ex(Layer * l_in, int num_filters, float l2_alpha, float dropout_rate)
+{
+    Layer * l = l_in;
+
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::UpSampling2D(l, {2, 2});
+    l = eddl::Conv2D(l, num_filters, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    return l;
+}
+
+Net * model_covid_qu_ex_01(const std::vector<int> in_shape, const int num_classes)
+{
+    float l2_alpha = 0.0f; // 1.0e-5f;
+    float dropout_rate = 0.0f; // 0.5f;
+
+    Layer * in_ = eddl::Input(in_shape);
+
+    Layer * l_down = in_;
+    l_down = descending_block_qu_ex(l_down,  64, l2_alpha, 0.0f        ); // 256 x 256
+    l_down = descending_block_qu_ex(l_down,  64, l2_alpha, dropout_rate); // 128 x 128
+    l_down = descending_block_qu_ex(l_down, 128, l2_alpha, dropout_rate); //  64 x  64
+    l_down = descending_block_qu_ex(l_down, 128, l2_alpha, dropout_rate); //  32 x  32
+    l_down = descending_block_qu_ex(l_down, 256, l2_alpha, dropout_rate); //  16 x  16
+    l_down = descending_block_qu_ex(l_down, 256, l2_alpha, dropout_rate); //   8 x   8
+    //l_down = descending_block_qu_ex(l_down, 256, l2_alpha, dropout_rate); //   4 x   4
+
+    Layer * l = l_down;
+    l = eddl::Conv2D(l, 256, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::Conv2D(l, 256, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+
+    Layer * bottleneck = l;
+
+    Layer * l_up = l;
+    //l_up = ascending_block_qu_ex(l_up, 256, l2_alpha, dropout_rate); //   4 x   4
+    l_up = ascending_block_qu_ex(l_up, 256, l2_alpha, dropout_rate); //   8 x   8
+    l_up = ascending_block_qu_ex(l_up, 256, l2_alpha, dropout_rate); //  16 x  16
+    l_up = ascending_block_qu_ex(l_up, 128, l2_alpha, dropout_rate); //  32 x  32
+    l_up = ascending_block_qu_ex(l_up, 128, l2_alpha, dropout_rate); //  64 x  64
+    l_up = ascending_block_qu_ex(l_up,  64, l2_alpha, dropout_rate); // 128 x 128
+    l_up = ascending_block_qu_ex(l_up,  64, l2_alpha, dropout_rate); // 256 x 256
+
+
+    Layer * mask_out_ = eddl::Sigmoid(eddl::Conv2D(l_up, 1, {1, 1}, {1, 1}, "same"));
+    //Layer * mask_out_ = eddl::Conv2D(l_up, 1, {1, 1}, {1, 1}, "same");
+
+    l = eddl::Flatten(bottleneck);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 2048);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 1024);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 512);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::Dense(l, num_classes);
+    Layer * clf_out_ = eddl::Softmax(l);
+
+    return eddl::Model({in_}, {mask_out_, clf_out_});
+}
+Net * model_covid_qu_ex_02(const std::vector<int> in_shape, const int num_classes)
+{
+    float l2_alpha = 0.0f; // 1.0e-5f;
+    float dropout_rate = 0.0f; // 0.5f;
+
+    Layer * in_ = eddl::Input(in_shape);
+
+    int filters = 32;
+
+    Layer * l_down_256 = in_; // 256 x 256
+    Layer * l_down_128 = descending_block_qu_ex(l_down_256, filters * 1, l2_alpha, 0.0f        ); // 128 x 128
+    Layer * l_down_064 = descending_block_qu_ex(l_down_128, filters * 2, l2_alpha, dropout_rate); //  64 x  64
+    Layer * l_down_032 = descending_block_qu_ex(l_down_064, filters * 2, l2_alpha, dropout_rate); //  32 x  32
+    Layer * l_down_016 = descending_block_qu_ex(l_down_032, filters * 4, l2_alpha, dropout_rate); //  16 x  16
+    Layer * l_down_008 = descending_block_qu_ex(l_down_016, filters * 4, l2_alpha, dropout_rate); //   8 x   8
+    Layer * l_down_004 = descending_block_qu_ex(l_down_008, filters * 8, l2_alpha, dropout_rate); //   4 x   4
+
+    Layer * l = l_down_004;
+    l = eddl::Conv2D(l, filters * 4, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::Conv2D(l, filters * 4, {3, 3}, {1, 1}, "same");
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+
+    Layer * bottleneck = l;
+
+    Layer * l_up_004 = bottleneck;
+    //l_up_004 = eddl::Concat({l_up_004, l_down_004});
+    Layer * l_up_008 = ascending_block_qu_ex(l_up_004, filters * 8, l2_alpha, dropout_rate); //   8 x   8
+    l_up_008 = eddl::Concat({l_up_008, l_down_008});
+    Layer * l_up_016 = ascending_block_qu_ex(l_up_008, filters * 4, l2_alpha, dropout_rate); //  16 x  16
+    l_up_016 = eddl::Concat({l_up_016, l_down_016});
+    Layer * l_up_032 = ascending_block_qu_ex(l_up_016, filters * 4, l2_alpha, dropout_rate); //  32 x  32
+    l_up_032 = eddl::Concat({l_up_032, l_down_032});
+    Layer * l_up_064 = ascending_block_qu_ex(l_up_032, filters * 2, l2_alpha, dropout_rate); //  64 x  64
+    l_up_064 = eddl::Concat({l_up_064, l_down_064});
+    Layer * l_up_128 = ascending_block_qu_ex(l_up_064, filters * 2, l2_alpha, dropout_rate); // 128 x 128
+    l_up_128 = eddl::Concat({l_up_128, l_down_128});
+    Layer * l_up_256 = ascending_block_qu_ex(l_up_128, filters * 1, l2_alpha, dropout_rate); // 256 x 256
+
+
+    Layer * mask_out_ = eddl::Sigmoid(eddl::Conv2D(l_up_256, 1, {1, 1}, {1, 1}, "same"));
+    //Layer * mask_out_ = eddl::Conv2D(l_up_256, 1, {1, 1}, {1, 1}, "same");
+
+    l = eddl::Flatten(bottleneck);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 1024);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 1024);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    if (dropout_rate > 0.0) l = eddl::Dropout(l, dropout_rate);
+    l = eddl::Dense(l, 512);
+    if (l2_alpha > 0.0) l = eddl::L2(l, l2_alpha);
+    l = eddl::ReLu(l);
+    l = eddl::Dense(l, num_classes);
+    Layer * clf_out_ = eddl::Softmax(l);
+
+    return eddl::Model({in_}, {mask_out_, clf_out_});
+}
+
 std::tuple<Net *, bool, std::vector<std::string>>
 resnet(const std::vector<int> in_shape,
        const int num_classes,
@@ -410,6 +554,9 @@ get_model(const std::string &model_name,
     return resnet(in_shape, num_classes, 101, classifier_output, true);
   if (model_name == "Pretrained_ResNet152")
     return resnet(in_shape, num_classes, 152, classifier_output, true);
+
+  if (model_name == "covid19-qu-ex-01") return {model_covid_qu_ex_01(in_shape, num_classes), true, {}};
+  if (model_name == "covid19-qu-ex-02") return {model_covid_qu_ex_02(in_shape, num_classes), true, {}};
 
   std::cout << "The model name provided (\"" << model_name
             << "\") is not valid!\n";

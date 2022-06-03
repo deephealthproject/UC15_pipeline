@@ -37,6 +37,20 @@ target_link_libraries(
   models)
 
 
+set(TRAIN_DISTR_EXECUTABLE "train_2")
+add_executable(${TRAIN_DISTR_EXECUTABLE} train_2.cpp)
+target_link_libraries(
+  ${TRAIN_DISTR_EXECUTABLE}
+  EDDL::eddl
+  ECVL_CORE
+  ECVL_EDDL
+  DATASET
+  utils
+  augmentations
+  training
+  test
+  models)
+
 set(TRAIN_DISTR_EXECUTABLE "train_distr")
 add_executable(${TRAIN_DISTR_EXECUTABLE} train_distr.cpp)
 target_link_libraries(

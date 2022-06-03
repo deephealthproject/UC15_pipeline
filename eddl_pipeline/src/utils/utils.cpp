@@ -130,10 +130,29 @@ std::string get_current_time_str(const std::string time_format) {
   auto t = std::time(nullptr);
   auto tm = *std::localtime(&t);
 
+  char buff[128];
+
+  sprintf(buff, "%04d-%02d-%02d-%02d-%02d-%02d", 1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  return std::string(buff);
+/*
   // Build the string
   std::ostringstream oss;
-  oss << std::put_time(&tm, time_format.c_str());
+  //oss << std::put_time(&tm, time_format.c_str());
+  oss << tm.tm_year + 1900 << '-';
+  if ((tm.tm_mon+1) < 10) {
+     oss << '0' << tm.tm_mon + 1 << '-';
+  } else {
+     oss << tm.tm_mon + 1 << '-';
+  }
+  if (tm.tm_mday < 10) {
+     oss << '0' << tm.tm_mday;
+  } else {
+     oss << tm.tm_mday;
+  }
+  os << '-';
+  os << tm.tm_hour << 
   return oss.str();
+*/
 }
 
 ecvl::ColorType get_color_type(const std::string rgb_or_gray) {
@@ -153,4 +172,5 @@ CompServ *get_computing_service(const Arguments args) {
     return eddl::CS_CPU(-1, "full_mem");
   else
     return eddl::CS_GPU(args.gpus, args.lsb, "full_mem");
+    //return eddl::CS_GPU(args.gpus, args.lsb, "mid_mem");
 }
